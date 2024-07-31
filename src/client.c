@@ -38,6 +38,45 @@ bool send_ACK(kvHandle* kv_handle){
 
 ////////////////////////////////////////////////////////////////////////////////////
 
+bool client_set_eager(void *kv_handle, const char *key, const char *value){
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
+    // send eager message
+    char* flag = "se";
+    sprintf(ctx.buf, "%s:%s:%s%c", flag, key, value, '\0');
+
+    // send on the wire
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
+}
+
+bool client_set_rendezvous(void *kv_handle, const char *key, const char *value){
+    char* msg_size = (char*)malloc(10);
+    sprintf(msg_size, "%d", strlen(value));
+    // send rendezvous control message
+    char* msg = (char*)malloc(strlen(msg_size) + 4);
+    char* flag = "sr";
+    // receive rendezvous control message: "sr:{size of value}"
+    sprintf(msg, "%s:%s:%s%c", flag, key, msg_size, '\0');
+
+    // send on the wire
+    if (send_data_str(kv_handle, msg) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////////
+
 int kv_open(char *servername, void **kv_handle){
     struct pingpong_context** ctx_p = (struct pingpong_context**)kv_handle;
     init_connection(servername, ctx_p);
@@ -45,24 +84,22 @@ int kv_open(char *servername, void **kv_handle){
 }
 
 int kv_set(void *kv_handle, const char *key, const char *value){
-    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     // Flag = {get, set}
-    char flag = 's';
-    sprintf(ctx.buf, "%c:%s:%s%c", flag, key, value, '\0');
-
-    // send on the wire
-    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
-        return EXIT_FAILURE;
+    if (strlen(value) < 4*KB-3){
+        // send rendezvous control message
+        client_set_eager(kv_handle, key, value);
     }
-
+    else{
+        client_set_rendezvous(kv_handle, key, value);
+    }
     return EXIT_SUCCESS;
 }
 
 int kv_get(void *kv_handle, const char *key, char **value){
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     // Flag = {get, set}
-    char flag = 'g';
-    sprintf(ctx.buf, "%c:%s:%c", flag, key,'\0');
+    char* flag = "g0";
+    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
@@ -83,7 +120,6 @@ int kv_get(void *kv_handle, const char *key, char **value){
         int size = atoi(buf);
 
     }
-
 }
 
 /* Called after get() on value pointer */
