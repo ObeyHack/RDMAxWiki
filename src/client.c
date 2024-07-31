@@ -55,8 +55,6 @@ int kv_set(void *kv_handle, const char *key, const char *value){
         return EXIT_FAILURE;
     }
 
-    // wait for ACK
-    pp_wait_completions(&ctx, 1);
     return EXIT_SUCCESS;
 }
 
@@ -64,16 +62,28 @@ int kv_get(void *kv_handle, const char *key, char **value){
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     // Flag = {get, set}
     char flag = 'g';
-    sprintf(ctx.buf, "%c:%s:-%c", flag, key,'\0');
+    sprintf(ctx.buf, "%c:%s:%c", flag, key,'\0');
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 
     // receive the value
     pp_wait_completions(&ctx, 1);
-    *value = ctx.buf;
+    char* buf = ctx.buf;
+    if (buf[0] == 'e'){
+        // copy without the flag in the form of "e:value"
+        buf = buf + 2;
+        *value = (char*)malloc(strlen(buf) + 1);
+        sprintf(*value, "%s", buf);
+        return EXIT_SUCCESS;
+    }
+    else{
+        buf = buf + 2;
+        // receive rendezvous control message
+        int size = atoi(buf);
 
-    return EXIT_SUCCESS;
+    }
+
 }
 
 /* Called after get() on value pointer */

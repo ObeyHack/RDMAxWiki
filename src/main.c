@@ -4,6 +4,16 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* value){
+    // value is bigger than 4KB
+    // send rendezvous control message: "r:{size of value}"
+    char* msg = (char*)malloc((int)strlen(value) + 3);
+    if (msg == NULL){
+        return EXIT_FAILURE;
+    }
+    sprintf(msg, "r:%d", (int)strlen(value));
+    send_data_str(kv_handle, msg);
+}
 
 bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     // Data format: flag:key:value
@@ -22,8 +32,8 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
         if (set_item(db, key, value) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
-        send_ACK(kv_handle);
     }
+
     else{
         char* key = strtok(NULL, ":");
         char* value;
@@ -32,7 +42,24 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
         }
         // turn value into a string
         value = strtok(value, "\0");
-        send_data_str(kv_handle, value);
+        if (strlen(value) < 4*KB-3){
+            // add a flag to the value in the form of "e:value"
+            //TODO: extra malloc
+            char* new_value = (char*)malloc(strlen(value) + 3);
+            if (new_value == NULL){
+                return EXIT_FAILURE;
+            }
+            sprintf(new_value, "e:%s", value);
+            send_data_str(kv_handle, new_value);
+            free(new_value);
+        }
+        else{
+            // send rendezvous
+            if (server_set_rendezvous(db, kv_handle, value) == EXIT_FAILURE){
+                return EXIT_FAILURE;
+            }
+        }
+
     }
     return EXIT_SUCCESS;
 }
@@ -60,16 +87,18 @@ int main(int argc, char *argv[]) {
     if (argc > 1) {
         printf("Connected to server %s\n", servername);
         kv_open(servername, (void **) &kv_handle);
-        if (kv_set(kv_handle, "key", "value") == EXIT_FAILURE) {
+        // msg bigger than 4KB
+        const char* value = malloc(4*KB+10);
+        if (kv_set(kv_handle, "key", value) == EXIT_FAILURE) {
             printf("Failed to set key\n");
             return EXIT_FAILURE;
         }
-        char* value;
-        if (kv_get(kv_handle, "key", &value) == EXIT_FAILURE) {
+        char* value_retrieved;
+        if (kv_get(kv_handle, "key", &value_retrieved) == EXIT_FAILURE) {
             printf("Failed to get key\n");
             return EXIT_FAILURE;
         }
-        printf("Value: %s\n", value);
+        printf("Value: %s\n", value_retrieved);
     }
 
     else{

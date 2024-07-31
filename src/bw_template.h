@@ -37,6 +37,7 @@ struct pingpong_context {
 #define MEGA_POWER 20
 #define PORT 8543
 #define KB 1024
+#define BUF_SIZE 4096
 
 static struct pingpong_context *pp_init_ctx(struct ibv_device *ib_dev, int size,
                                             int rx_depth, int tx_depth, int port,
