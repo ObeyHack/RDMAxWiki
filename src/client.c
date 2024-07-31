@@ -78,10 +78,13 @@ int kv_get(void *kv_handle, const char *key, char **value){
 
 /* Called after get() on value pointer */
 void kv_release(char *value){
-    return;
+    free(value);
 }
 
 /* Destroys the QP */
 int kv_close(void *kv_handle){
-    return 0;
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
+    pp_close_ctx(&ctx);
+    free(kv_handle);
+    return EXIT_SUCCESS;
 }
