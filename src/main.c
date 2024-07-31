@@ -1,6 +1,6 @@
 #include "client.h"
 #include "bw_template.h"
-
+#include "database.h"
 
 
 
@@ -13,6 +13,9 @@ int main(int argc, char *argv[]) {
     if (servername)
         printf("Connected to server %s\n", servername);
 
-    else
-        printf("Failed to connect to server\n");
+    else{
+        printf("Server started\n");
+        Database* db;
+        create_database(&db);
+    }
 }
