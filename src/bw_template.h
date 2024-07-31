@@ -32,6 +32,12 @@ struct pingpong_context {
 };
 
 
+#define MAX_INLINE 60
+#define MEGABIT 1048576
+#define MEGA_POWER 20
+#define PORT 8543
+#define KB 1024
+
 static struct pingpong_context *pp_init_ctx(struct ibv_device *ib_dev, int size,
                                             int rx_depth, int tx_depth, int port,
                                             int use_event, int is_server);
@@ -42,7 +48,7 @@ static int pp_post_recv(struct pingpong_context *ctx, int n);
 
 static int pp_post_send(struct pingpong_context *ctx);
 
-static int flagged_pp_post_send(struct pingpong_context *ctx, unsigned int flag);
+int flagged_pp_post_send(struct pingpong_context *ctx, unsigned int flag);
 
 int pp_wait_completions(struct pingpong_context *ctx, int iters);
 

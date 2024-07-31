@@ -616,6 +616,7 @@ static void usage(const char *argv0)
 #define MEGABIT 1048576
 #define MEGA_POWER 20
 #define PORT 8543
+#define KB 1024
 
 int server(struct pingpong_context *ctx);
 int client(struct pingpong_context *ctx, int tx_depth);
@@ -634,7 +635,7 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
     int                      tx_depth = 100;
     int                      iters = 1000;
     int                      use_event = 0;
-    int                      size = MEGABIT;
+    int                      size = 4*KB;
     int                      sl = 0;
     int                      gidx = -1;
     char                     gid[33];
@@ -753,7 +754,7 @@ double calc_throughput(struct timeval start, struct timeval end, int data_size){
     return throughput;
 }
 
-static int flagged_pp_post_send(struct pingpong_context *ctx, unsigned int flag)
+int flagged_pp_post_send(struct pingpong_context *ctx, unsigned int flag)
 {
     struct ibv_sge list = {
             .addr	= (uint64_t)ctx->buf,
@@ -799,12 +800,15 @@ int send_data(struct pingpong_context *ctx, int tx_depth, int data_size, int ite
 }
 
 int receive_data(struct pingpong_context *ctx, int data_size, int iters){
-    unsigned int flag = IBV_SEND_SIGNALED;
+    unsigned int flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
     pp_wait_completions(ctx, iters);
+    int size = ctx->size;
+    ctx->size = 1;
     if (flagged_pp_post_send(ctx, flag)) {
         fprintf(stderr, "Server couldn't post send\n");
         return 1;
     }
+    ctx->size = size;
     //printf("Server: received %d bytes for %d iterations\n", data_size, iters);
     //flaged_pp_post_send(ctx, flag);
     pp_wait_completions(ctx, 1);
