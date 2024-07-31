@@ -1,6 +1,9 @@
 #include "client.h"
 
+
 int kv_open(char *servername, void **kv_handle){
+    struct pingpong_context** ctx_p = (struct pingpong_context**)kv_handle;
+    init_connection(servername, ctx_p);
     return 0;
 }
 

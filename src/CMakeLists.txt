@@ -5,5 +5,12 @@ set(CMAKE_C_STANDARD 11)
 
 link_libraries("ibverbs")
 
-add_executable(server bw_template.c)
-add_executable(client client.c client.h)
+add_executable(client main.c bw_template.c bw_template.h
+        client.c client.h
+        database.h
+        database.c)
+
+add_executable(server main.c bw_template.c bw_template.h
+        client.c client.h
+        database.h
+        database.c)

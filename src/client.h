@@ -2,6 +2,11 @@
 #ifndef _CLIENT_H_
 #define _CLIENT_H_
 
+#include "bw_template.h"
+
+struct kv_handle {
+    struct pingpong_context ctx;
+};
 
 int kv_open(char *servername, void **kv_handle); /*Connect to server*/
 
