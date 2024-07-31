@@ -1,12 +1,14 @@
-
 #ifndef _CLIENT_H_
 #define _CLIENT_H_
 
 #include "bw_template.h"
+#include <stdbool.h>
 
-struct kv_handle {
+
+typedef struct kv_handle {
     struct pingpong_context ctx;
-};
+}kvHandle;
+
 
 int kv_open(char *servername, void **kv_handle); /*Connect to server*/
 
@@ -18,5 +20,10 @@ void kv_release(char *value);/* Called after get() on value pointer */
 
 int kv_close(void *kv_handle); /* Destroys the QP */
 
+//////
+
+bool send_data_str(void *kv_handle, char* buf);
+
+bool send_ACK(kvHandle* kv_handle);
 
 #endif //_CLIENT_H_
