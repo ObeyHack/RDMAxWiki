@@ -6,10 +6,20 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
+#include "infiniband/verbs.h"
+
+#define KB 1024
+
+typedef struct Value {
+    char* value;
+    int size;
+    bool is_large;
+    struct ibv_mr* mr;
+} Value;
 
 typedef struct item {
-    char* key;
-    char* value;
+    char key[4*KB];
+    Value* value;
 } Item;
 
 typedef struct node {
@@ -23,11 +33,11 @@ typedef struct database {
 
 
 
-bool create_database(Database** db_p);
+bool create_database(Database** db);
 
-bool set_item(Database* db, char* key, char* value);
+bool set_item(Database* db, const char* key, Value* value);
 
-bool get_value(Database* db, char* key, char** value_p);
+bool get_value(Database* db, const char* key, Value** value_p);
 
 
 

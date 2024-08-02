@@ -596,7 +596,7 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters)
 int pp_post_rdma_send(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey)
 {
     struct ibv_sge list = {
-            .addr	= l_mr->addr,
+            .addr	= (uint64_t)l_mr->addr,
             .length = l_mr->length,
             .lkey	= l_mr->lkey
     };

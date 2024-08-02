@@ -55,4 +55,6 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters);
 
 int init_connection(char* servername, struct pingpong_context** ctx_p);
 
+int pp_post_rdma_send(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey);
+
 #endif //WORKSHOP_NETWORK_EX3_BW_TEMPLATE_H
