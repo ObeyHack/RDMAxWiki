@@ -592,6 +592,30 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters)
     return 0;
 }
 
+
+int pp_post_rdma_send(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey)
+{
+    struct ibv_sge list = {
+            .addr	= l_mr->addr,
+            .length = l_mr->length,
+            .lkey	= l_mr->lkey
+    };
+
+    struct ibv_send_wr *bad_wr, wr = {
+            .wr_id	    = PINGPONG_SEND_WRID,
+            .sg_list    = &list,
+            .num_sge    = 1,
+            .opcode     = IBV_WR_RDMA_READ,
+            .send_flags = IBV_SEND_SIGNALED,
+            .next       = NULL,
+            .wr.rdma.remote_addr = r_addr,
+            .wr.rdma.rkey = rkey
+    };
+
+    return ibv_post_send(ctx->qp, &wr, &bad_wr);
+}
+
+
 static void usage(const char *argv0)
 {
     printf("Usage:\n");
@@ -610,7 +634,6 @@ static void usage(const char *argv0)
     printf("  -e, --events           sleep on CQ events (default poll)\n");
     printf("  -g, --gid-idx=<gid index> local port gid index\n");
 }
-
 
 #define MAX_INLINE 60
 #define MEGABIT 1048576

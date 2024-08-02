@@ -52,18 +52,45 @@ bool client_set_eager(void *kv_handle, const char *key, const char *value){
 }
 
 bool client_set_rendezvous(void *kv_handle, const char *key, const char *value){
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
+
+    // 1. send malloc size, Format: "sr:key:valueSize\0"
     char* msg_size = (char*)malloc(10);
     sprintf(msg_size, "%d", strlen(value));
-    // send rendezvous control message
     char* msg = (char*)malloc(strlen(msg_size) + 4);
     char* flag = "sr";
-    // receive rendezvous control message: "sr:{size of value}"
     sprintf(msg, "%s:%s:%s%c", flag, key, msg_size, '\0');
-
-    // send on the wire
     if (send_data_str(kv_handle, msg) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
+
+    // 2. register memory
+    struct ibv_mr* mr = ibv_reg_mr(ctx.pd, (void*) value, strlen(value), IBV_ACCESS_LOCAL_WRITE);
+    if (!mr){
+        fprintf(stderr, "Couldn't register memory region\n");
+        return EXIT_FAILURE;
+    }
+
+    // 3. send memory region, Format: "rkey:addr\0"
+    char* rkey = (char*)malloc(10);
+    sprintf(rkey, "%d", mr->rkey);
+    char* addr = (char*)malloc(20);
+    sprintf(addr, "%p", value);
+    char* msg2 = (char*)malloc(strlen(rkey) + strlen(addr) + 2);
+    sprintf(msg2, "%s:%s%c", rkey, addr, '\0');
+    if (send_data_str(kv_handle, msg2) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+
+    // 4. Wait for ACK
+    pp_wait_completions(&ctx, 1);
+
+    // 5. Deregister memory
+    if (ibv_dereg_mr(mr)){
+        fprintf(stderr, "Couldn't deregister memory region\n");
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
 
 

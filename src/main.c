@@ -13,6 +13,7 @@ bool server_get_rendezvous(Database* db, kvHandle* kv_handle, char* value){
     }
     sprintf(msg, "r:%d", (int)strlen(value));
     send_data_str(kv_handle, msg);
+    return EXIT_SUCCESS;
 }
 
 bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int value_size){
@@ -26,7 +27,11 @@ bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int val
     }
 
     // Exchange memory regions
+
+    return EXIT_SUCCESS;
 }
+
+
 
 bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     // Data format: flag:key:value
