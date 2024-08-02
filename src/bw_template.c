@@ -638,7 +638,7 @@ static void usage(const char *argv0)
 #define MAX_INLINE 60
 #define MEGABIT 1048576
 #define MEGA_POWER 20
-#define PORT 8543
+#define PORT 12345
 #define KB 1024
 
 int server(struct pingpong_context *ctx);
@@ -670,14 +670,14 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
     dev_list = ibv_get_device_list(NULL);
     if (!dev_list) {
         perror("Failed to get IB devices list");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (!ib_devname) {
         ib_dev = *dev_list;
         if (!ib_dev) {
             fprintf(stderr, "No IB devices found\n");
-            return 1;
+            return EXIT_FAILURE;
         }
     } else {
         int i;
@@ -687,42 +687,42 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
         ib_dev = dev_list[i];
         if (!ib_dev) {
             fprintf(stderr, "IB device %s not found\n", ib_devname);
-            return 1;
+            return EXIT_FAILURE;
         }
     }
 
     *(ctx_p) = pp_init_ctx(ib_dev, size, rx_depth, tx_depth, ib_port, use_event, !servername);
     if (!(*(ctx_p)))
-        return 1;
+        return EXIT_FAILURE;
 
     (*(ctx_p))->routs = pp_post_recv((*(ctx_p)), (*(ctx_p))->rx_depth);
     if ((*(ctx_p))->routs < (*(ctx_p))->rx_depth) {
         fprintf(stderr, "Couldn't post receive (%d)\n", (*(ctx_p))->routs);
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (use_event)
         if (ibv_req_notify_cq((*(ctx_p))->cq, 0)) {
             fprintf(stderr, "Couldn't request CQ notification\n");
-            return 1;
+            return EXIT_FAILURE;
         }
 
 
     if (pp_get_port_info((*(ctx_p))->context, ib_port, &(*(ctx_p))->portinfo)) {
         fprintf(stderr, "Couldn't get port info\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     my_dest.lid = (*(ctx_p))->portinfo.lid;
     if ((*(ctx_p))->portinfo.link_layer == IBV_LINK_LAYER_INFINIBAND && !my_dest.lid) {
         fprintf(stderr, "Couldn't get local LID\n");
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (gidx >= 0) {
         if (ibv_query_gid((*(ctx_p))->context, ib_port, gidx, &my_dest.gid)) {
             fprintf(stderr, "Could not get local gid for gid index %d\n", gidx);
-            return 1;
+            return EXIT_FAILURE;
         }
     } else
         memset(&my_dest.gid, 0, sizeof my_dest.gid);
@@ -730,25 +730,29 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
     my_dest.qpn = (*(ctx_p))->qp->qp_num;
     my_dest.psn = lrand48() & 0xffffff;
     inet_ntop(AF_INET6, &my_dest.gid, gid, sizeof gid);
-    printf("  local address:  LID 0x%04x, QPN 0x%06x, PSN 0x%06x, GID %s\n",
-           my_dest.lid, my_dest.qpn, my_dest.psn, gid);
+//    printf("  local address:  LID 0x%04x, QPN 0x%06x, PSN 0x%06x, GID %s\n",
+//           my_dest.lid, my_dest.qpn, my_dest.psn, gid);
 
 
-    if (servername)
+    if (servername){
         rem_dest = pp_client_exch_dest(servername, port, &my_dest);
+        if (rem_dest == NULL)
+            return EXIT_FAILURE;
+        inet_ntop(AF_INET6, &rem_dest->gid, gid, sizeof gid);
+        if (pp_connect_ctx((*(ctx_p)), ib_port, my_dest.psn, mtu, sl, rem_dest, gidx))
+            return EXIT_FAILURE;
+    }
+
     else
         rem_dest = pp_server_exch_dest((*(ctx_p)), ib_port, mtu, port, sl, &my_dest, gidx);
 
     if (!rem_dest)
-        return 1;
+        return EXIT_FAILURE;
 
-    inet_ntop(AF_INET6, &rem_dest->gid, gid, sizeof gid);
-    printf("  remote address: LID 0x%04x, QPN 0x%06x, PSN 0x%06x, GID %s\n",
-           rem_dest->lid, rem_dest->qpn, rem_dest->psn, gid);
 
-    if (servername)
-        if (pp_connect_ctx((*(ctx_p)), ib_port, my_dest.psn, mtu, sl, rem_dest, gidx))
-            return 1;
+//    printf("  remote address: LID 0x%04x, QPN 0x%06x, PSN 0x%06x, GID %s\n",
+//           rem_dest->lid, rem_dest->qpn, rem_dest->psn, gid);
+
 
 //    if (servername) {
 //        // Client
@@ -760,7 +764,7 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
 //
 //    ibv_free_device_list(dev_list);
 //    free(rem_dest);
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 

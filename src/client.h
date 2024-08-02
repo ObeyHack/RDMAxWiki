@@ -3,7 +3,7 @@
 
 #include "bw_template.h"
 #include <stdbool.h>
-
+#include "database.h"
 
 typedef struct kv_handle {
     struct pingpong_context ctx;
@@ -20,10 +20,8 @@ void kv_release(char *value);/* Called after get() on value pointer */
 
 int kv_close(void *kv_handle); /* Destroys the QP */
 
-//////
+////// Server functions
 
-bool send_data_str(void *kv_handle, char* buf);
-
-bool send_ACK(kvHandle* kv_handle);
+bool receive_query(Database* db, kvHandle* kv_handle);
 
 #endif //_CLIENT_H_
