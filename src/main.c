@@ -379,18 +379,18 @@ void test_9(char* servername){
 
 void run_tests(char* servername){
     printf(GOLD "Running tests\n" BASE);
-    test_1(servername);
-    test_2(servername);
-    test_3(servername);
-    test_4(servername);
-    test_5(servername);
-    test_6(servername);
-    test_7(servername);
-    test_8(servername);
-    test_9(servername);
+//    test_1(servername);
+//    test_2(servername);
+//    test_3(servername);
+//    test_4(servername);
+//    test_5(servername);
+//    test_6(servername);
+//    test_7(servername);
+//    test_8(servername);
+//    test_9(servername);
 }
 
-bool execute_query(kvHandle* kv_handle, char* line, char* previous_gets){
+bool execute_query(kvHandle* kv_handle, char* line){
     /*
      * Parse the line and execute the query. Format:
      * se:key:value

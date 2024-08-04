@@ -58,7 +58,7 @@ bool client_set_rendezvous(void *kv_handle, const char *key, const char *value){
 
     // 1. send malloc size, Format: "sr:key:valueSize\0"
     char* msg_size = (char*)malloc(10);
-    sprintf(msg_size, "%d", strlen(value));
+    sprintf(msg_size, "%lu", strlen(value));
     char* flag = "sr";
     sprintf(ctx.buf, "%s:%s:%s%c", flag, key, msg_size, '\0');
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
@@ -66,7 +66,7 @@ bool client_set_rendezvous(void *kv_handle, const char *key, const char *value){
     }
 
     // 2. register memory
-    struct ibv_mr* mr = ibv_reg_mr(ctx.pd, (void*) value, strlen(value), IBV_ACCESS_LOCAL_WRITE);
+    struct ibv_mr* mr = ibv_reg_mr(ctx.pd, (void*) value, strlen(value), IBV_ACCESS_REMOTE_READ);
     if (!mr){
         fprintf(stderr, "Couldn't register memory region\n");
         return EXIT_FAILURE;
@@ -100,8 +100,7 @@ bool client_get_rendezvous(void *kv_handle, const char *key, char **value, int s
     value_buf[size] = '\0';
 
     // 2. register the buffer
-    struct ibv_mr* mr = ibv_reg_mr(ctx.pd, value_buf, strlen(value_buf), IBV_ACCESS_LOCAL_WRITE |
-                                                                            IBV_ACCESS_REMOTE_WRITE);
+    struct ibv_mr* mr = ibv_reg_mr(ctx.pd, value_buf, size, IBV_ACCESS_LOCAL_WRITE | IBV_ACCESS_REMOTE_WRITE);
     if (!mr){
         fprintf(stderr, "Couldn't register memory region\n");
         return EXIT_FAILURE;
@@ -177,7 +176,7 @@ bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int val
     value[value_size] = '\0';
 
     // 2. register the buffer
-    struct ibv_mr* mr = ibv_reg_mr(ctx.pd, (void*) value, strlen(value), IBV_ACCESS_LOCAL_WRITE |
+    struct ibv_mr* mr = ibv_reg_mr(ctx.pd, (void*) value, value_size, IBV_ACCESS_LOCAL_WRITE |
                                                                          IBV_ACCESS_REMOTE_READ |
                                                                          IBV_ACCESS_REMOTE_WRITE);
     if (!mr){
