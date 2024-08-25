@@ -7,11 +7,11 @@ bool send_data_str(void *kv_handle, char* buf){
     ctx.buf = buf;
     ctx.size = (int) strlen(buf) + 1;
 
-    unsigned int ctx_lag = IBV_SEND_SIGNALED;
+    unsigned int ctx_flag = IBV_SEND_SIGNALED;
     if (ctx.size < MAX_INLINE) {
-        ctx_lag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
+        ctx_flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
     }
-    if (flagged_pp_post_send(&ctx, ctx_lag)) {
+    if (flagged_pp_post_send(&ctx, ctx_flag)) {
         fprintf(stderr, "Client couldn't post send\n");
         return EXIT_FAILURE;
     }
@@ -250,6 +250,7 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
 
     //////////////////////// Set Eager ////////////////////////
     if (strcmp(flag, "se")==0){
+        printf("Eager set\n");
         char* value = strtok(NULL, ":");
         char* copy = (char*)malloc(strlen(value) + 1);
         if (copy == NULL){
@@ -262,8 +263,9 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
         return EXIT_SUCCESS;
     }
 
-        //////////////////////// Set Rendezvous ////////////////////////
+    //////////////////////// Set Rendezvous ////////////////////////
     else if (strcmp(flag, "sr")==0){
+        printf("Rendezvous set\n");
         char* size = strtok(NULL, ":");
         int size_int = atoi(size);
         if (server_set_rendezvous(db, kv_handle, key, size_int) == EXIT_FAILURE){
@@ -273,12 +275,14 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     }
 
     Value* value;
+
     if (get_value(db, key, &value) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 
     //////////////////////// Get Eager ////////////////////////
     if (value->is_large == false){
+        printf("Eager get\n");
         if (server_get_eager(kv_handle, value) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
@@ -286,6 +290,7 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
 
         //////////////////////// Get Rendezvous ////////////////////////
     else{
+        printf("Rendezvous get\n");
         if (server_get_rendezvous(db, kv_handle, value) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
@@ -310,13 +315,13 @@ bool receive_query(Database* db, kvHandle** kv_handle){
             &client_index) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
-
+    printf("Handling query from client %d\n", client_index);
 
     handle = kv_handle[client_index];
     ctx = (struct pingpong_context*)handle;
 
     // Parse data
-    if (parse_data(db, kv_handle, ctx->buf) == EXIT_FAILURE){
+    if (parse_data(db, handle, ctx->buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 
@@ -340,10 +345,14 @@ int kv_set(void *kv_handle, const char *key, const char *value){
     // Flag = {get, set}
     if (strlen(value) < 4*KB-3){
         // send rendezvous control message
-        client_set_eager(kv_handle, key, value);
+        if (client_set_eager(kv_handle, key, value) == EXIT_FAILURE){
+            return EXIT_FAILURE;
+        }
     }
     else{
-        client_set_rendezvous(kv_handle, key, value);
+        if (client_set_rendezvous(kv_handle, key, value) == EXIT_FAILURE){
+            return EXIT_FAILURE;
+        }
     }
     return EXIT_SUCCESS;
 }
@@ -373,8 +382,11 @@ int kv_get(void *kv_handle, const char *key, char **value){
         // Malloc size of the value. Format: "r:size"
         int size;
         sscanf(buf, "r:%d", &size);
-        client_get_rendezvous(kv_handle, key, value, size);
+        if (client_get_rendezvous(kv_handle, key, value, size) == EXIT_FAILURE){
+            return EXIT_FAILURE;
+        }
     }
+    return EXIT_SUCCESS;
 }
 
 /* Called after get() on value pointer */

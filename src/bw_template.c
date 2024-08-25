@@ -593,18 +593,19 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters)
 
 #define NUM_CLIENTS 2
 
-
+int prev_index = 0;
 int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, int* client_index){
     // This function is used to wait for completions from multiple clients and return the index of the client
     // that completed
 
     int rcnt = 0, scnt = 0;
+    int index = (prev_index + 1) % NUM_CLIENTS;
     while (rcnt + scnt < iters) {
         struct ibv_wc wc[WC_BATCH];
         int ne, i;
 
         do {
-            for (int index = 0; index < NUM_CLIENTS; index++){
+            for (; index < NUM_CLIENTS; index++){
                 ne = ibv_poll_cq(ctx_list[index]->cq, WC_BATCH, wc);
                 if (ne < 0) {
                     fprintf(stderr, "poll CQ failed %d\n", ne);
@@ -612,9 +613,11 @@ int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, i
                 }
                 if (ne > 0){
                     *client_index = index;
+                    prev_index = index;
                     break;
                 }
             }
+            index = 0;
         } while (ne < 1);
 
 

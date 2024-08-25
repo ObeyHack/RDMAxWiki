@@ -50,21 +50,27 @@ void test_double_client(char* servername){
     printf(GREEN "Test 1: Passed\n" BASE);
 }
 
-void test_2(char* servername){
-    printf(BLUE "Test 2: Set and Get in Eager mode\n" BASE);
+void test_connection(char* servername, kvHandle** kv_handle_ptr){
+    printf(BLUE "Test 1: Connection\n" BASE);
 
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
+    bool result = kv_open(servername, (void **) kv_handle_ptr);
     if (result == EXIT_FAILURE) {
-        printf(RED "Test 2: Failed\n" BASE);
+        printf(RED "Test 1: Failed\n" BASE);
         return;
     }
+
+
+    printf(GREEN "Test 1: Passed\n" BASE);
+}
+
+void test_2(kvHandle* kv_handle){
+    printf(BLUE "Test 2: Set and Get in Eager mode\n" BASE);
+
 
     // Set + Get
     char* key = "key";
     char* value = "value";
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 2: Failed\n" BASE);
         return;
@@ -79,31 +85,16 @@ void test_2(char* servername){
         return;
     }
 
-    // close connection
-    result = kv_close(kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 2: Failed\n" BASE);
-        return;
-    }
-
     printf(GREEN "Test 2: Passed\n" BASE);
 }
 
-void test_3(char* servername){
+void test_3(kvHandle* kv_handle){
     printf(BLUE "Test 3: Double Set and Get (different keys) in Eager mode\n" BASE);
-
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 3: Failed\n" BASE);
-        return;
-    }
 
     // Set + Get 1
     char* key = "key";
     char* value = "value";
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 3: Failed\n" BASE);
         return;
@@ -118,31 +109,17 @@ void test_3(char* servername){
         return;
     }
 
-    // close connection
-    result = kv_close(kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 3: Failed\n" BASE);
-        return;
-    }
-
     printf(GREEN "Test 3: Passed\n" BASE);
 }
 
-void test_4(char* servername){
+void test_4(kvHandle* kv_handle){
     printf(BLUE "Test 4: Double Set and Get (same keys) in Eager mode\n" BASE);
 
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 4: Failed\n" BASE);
-        return;
-    }
 
     // Set + Get 1
     char* key = "key";
     char* value = "value";
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 4: Failed\n" BASE);
         return;
@@ -157,26 +134,11 @@ void test_4(char* servername){
         return;
     }
 
-    // close connection
-    result = kv_close(kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 4: Failed\n" BASE);
-        return;
-    }
-
     printf(GREEN "Test 4: Passed\n" BASE);
 }
 
-void test_5(char* servername) {
+void test_5(kvHandle* kv_handle) {
     printf(BLUE "Test 5: Set and Get in Rendezvous mode\n" BASE);
-
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 5: Failed\n" BASE);
-        return;
-    }
 
     // Set + Get
     char* key = "key";
@@ -184,15 +146,8 @@ void test_5(char* servername) {
     memset(value, 'a', 4*KB+10);
     value[4*KB+10] = '\0';
 
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
 
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 5: Failed\n" BASE);
-        return;
-    }
-
-    // close connection
-    result = kv_close(kv_handle);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 5: Failed\n" BASE);
         return;
@@ -203,23 +158,15 @@ void test_5(char* servername) {
     printf(GREEN "Test 5: Passed\n" BASE);
 }
 
-void test_6(char* servername){
+void test_6(kvHandle* kv_handle){
     printf(BLUE "Test 6: Double Set and Get (different keys) in Rendezvous mode\n" BASE);
-
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 6: Failed\n" BASE);
-        return;
-    }
 
     // Set + Get 1
     char* key = "key";
     char* value = (char*)malloc(4*KB+10);
     memset(value, 'a', 4*KB+10);
     value[4*KB+10] = '\0';
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 6: Failed\n" BASE);
         return;
@@ -235,37 +182,21 @@ void test_6(char* servername){
         return;
     }
 
-    // close connection
-    result = kv_close(kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 6: Failed\n" BASE);
-        return;
-    }
-
-
     //deallocating memory
     free(value);
     free(value2);
     printf(GREEN "Test 6: Passed\n" BASE);
 }
 
-void test_7(char* servername){
+void test_7(kvHandle* kv_handle){
     printf(BLUE "Test 7: Double Set and Get (same keys) in Rendezvous mode\n" BASE);
-
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 7: Failed\n" BASE);
-        return;
-    }
 
     // Set + Get 1
     char* key = "key";
     char* value = (char*)malloc(4*KB+10);
     memset(value, 'a', 4*KB+10);
     value[4*KB+10] = '\0';
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 7: Failed\n" BASE);
         return;
@@ -280,35 +211,19 @@ void test_7(char* servername){
         return;
     }
 
-    // close connection
-    result = kv_close(kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 7: Failed\n" BASE);
-        return;
-    }
-
-
     //deallocating memory
     free(value);
     free(value2);
     printf(GREEN "Test 7: Passed\n" BASE);
 }
 
-void test_8(char* servername){
+void test_8(kvHandle* kv_handle){
     printf(BLUE "Test 8: Double Set and Get Eager then Rendezvous mode\n" BASE);
-
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 8: Failed\n" BASE);
-        return;
-    }
 
     // Set + Get 1
     char* key = "key";
     char* value = "value";
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 8: Failed\n" BASE);
         return;
@@ -323,36 +238,20 @@ void test_8(char* servername){
         return;
     }
 
-    // close connection
-    result = kv_close(kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 8: Failed\n" BASE);
-        return;
-    }
-
-
     //deallocating memory
     free(value2);
     printf(GREEN "Test 8: Passed\n" BASE);
 }
 
-void test_9(char* servername){
+void test_9(kvHandle* kv_handle){
     printf(BLUE "Test 9: Double Set and Get Rendezvous then Eager mode\n" BASE);
-
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 9: Failed\n" BASE);
-        return;
-    }
 
     // Set + Get 1
     char* key = "key";
     char* value = (char*)malloc(4*KB+10);
     memset(value, 'a', 4*KB+10);
     value[4*KB+10] = '\0';
-    result = set_get(kv_handle, key, value);
+    bool result = set_get(kv_handle, key, value);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 9: Failed\n" BASE);
         return;
@@ -361,13 +260,6 @@ void test_9(char* servername){
     // Set + Get 2
     char* value2 = "value2";
     result = set_get(kv_handle, key, value2);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test 9: Failed\n" BASE);
-        return;
-    }
-
-    // close connection
-    result = kv_close(kv_handle);
     if (result == EXIT_FAILURE) {
         printf(RED "Test 9: Failed\n" BASE);
         return;
@@ -395,14 +287,17 @@ void test_throughout(char* servername){
 
 void run_tests(char* servername){
     printf(GOLD "Running tests\n" BASE);
-    test_2(servername);
-    test_3(servername);
-    test_4(servername);
-    test_5(servername);
-    test_6(servername);
-    test_7(servername);
-    test_8(servername);
-    test_9(servername);
+    kvHandle *kv_handle;
+    test_connection(servername, &kv_handle);
+
+    test_2(kv_handle);
+    test_3(kv_handle);
+    test_4(kv_handle);
+    test_5(kv_handle);
+    test_6(kv_handle);
+    test_7(kv_handle);
+    test_8(kv_handle);
+    test_9(kv_handle);
 }
 
 
