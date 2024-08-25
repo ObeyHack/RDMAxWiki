@@ -38,6 +38,8 @@ struct pingpong_context {
 #define PORT 8543
 #define KB 1024
 #define BUF_SIZE 4096
+#define NUM_CLIENTS 2
+
 
 static struct pingpong_context *pp_init_ctx(struct ibv_device *ib_dev, int size,
                                             int rx_depth, int tx_depth, int port,
@@ -52,6 +54,10 @@ static int pp_post_send(struct pingpong_context *ctx);
 int flagged_pp_post_send(struct pingpong_context *ctx, unsigned int flag);
 
 int pp_wait_completions(struct pingpong_context *ctx, int iters);
+
+int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, int* client_index);
+
+
 
 int init_connection(char* servername, struct pingpong_context** ctx_p);
 

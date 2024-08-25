@@ -293,13 +293,30 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     return EXIT_SUCCESS;
 }
 
-bool receive_query(Database* db, kvHandle* kv_handle){
-    // Receive data
-    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
-    pp_wait_completions(&ctx, 1);
+bool receive_query(Database* db, kvHandle** kv_handle){
+    // get list of all the ctx
+    struct pingpong_context* ctx_list[NUM_CLIENTS];
+    kvHandle* handle;
+    struct pingpong_context* ctx;
+    for (int i = 0; i < NUM_CLIENTS; i++){
+        handle = kv_handle[i];
+        ctx = (struct pingpong_context*)handle;
+        ctx_list[i] = ctx;
+    }
+
+    // wait for completions
+    int client_index;
+    if (pp_wait_completions_clients(ctx_list, NUM_CLIENTS,
+            &client_index) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+
+
+    handle = kv_handle[client_index];
+    ctx = (struct pingpong_context*)handle;
 
     // Parse data
-    if (parse_data(db, kv_handle, ctx.buf) == EXIT_FAILURE){
+    if (parse_data(db, kv_handle, ctx->buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 

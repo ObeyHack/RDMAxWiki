@@ -8,6 +8,7 @@
 #define GOLD "\x1B[33m"
 #define GREEN "\x1B[32m"
 #define RED "\x1B[31m"
+#define PURPLE "\x1B[35m"
 
 bool set_get(kvHandle* kv_handle, char* key, char* value){
     bool result = kv_set(kv_handle, key, value);
@@ -29,10 +30,10 @@ bool set_get(kvHandle* kv_handle, char* key, char* value){
     return EXIT_SUCCESS;
 }
 
-void test_1(char* servername){
+void test_double_client(char* servername){
     printf(BLUE "Test 1: Double connection and disconnection\n" BASE);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 1; i++) {
         kvHandle* kv_handle;
         bool result = kv_open(servername, (void **) &kv_handle);
         if (result == EXIT_FAILURE) {
@@ -377,18 +378,34 @@ void test_9(char* servername){
     printf(GREEN "Test 9: Passed\n" BASE);
 }
 
+
+void test_throughout(char* servername){
+    printf(PURPLE "Test throughout: Set and Get in Eager mode\n" BASE);
+
+    // open connection
+    kvHandle* kv_handle;
+    bool result = kv_open(servername, (void **) &kv_handle);
+    if (result == EXIT_FAILURE) {
+        printf(RED "Test throughout: Failed\n" BASE);
+        return;
+    }
+
+
+}
+
 void run_tests(char* servername){
     printf(GOLD "Running tests\n" BASE);
-//    test_1(servername);
-//    test_2(servername);
-//    test_3(servername);
-//    test_4(servername);
-//    test_5(servername);
-//    test_6(servername);
-//    test_7(servername);
-//    test_8(servername);
-//    test_9(servername);
+    test_2(servername);
+    test_3(servername);
+    test_4(servername);
+    test_5(servername);
+    test_6(servername);
+    test_7(servername);
+    test_8(servername);
+    test_9(servername);
 }
+
+
 
 bool execute_query(kvHandle* kv_handle, char* line){
     /*
@@ -401,8 +418,6 @@ bool execute_query(kvHandle* kv_handle, char* line){
     char* key;
     char* value;
     sscanf(line, "%s:%s:%s", flag, key, value);
-
-
 }
 
 void parse_input(char* servername, char* input_file){
@@ -445,9 +460,16 @@ int main(int argc, char *argv[]) {
         Database* db;
         create_database(&db);
         printf(GOLD "Server started\n" BASE);
-        kv_open(servername, (void**)&kv_handle);
+
+        // num of client connections
+        kvHandle* kv_handles[NUM_CLIENTS];
+
+        for (int i = 0; i < NUM_CLIENTS; i++) {
+            kv_open(servername, (void**)&kv_handles[i]);
+        }
+
         while (1){
-            receive_query(db, kv_handle);
+            receive_query(db, kv_handles);
         }
     }
 

@@ -552,7 +552,6 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters)
                 fprintf(stderr, "poll CQ failed %d\n", ne);
                 return 1;
             }
-
         } while (ne < 1);
 
         for (i = 0; i < ne; ++i) {
@@ -585,6 +584,71 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters)
                 fprintf(stderr, "Completion for unknown wr_id %d\n",
                         (int) wc[i].wr_id);
                 return 1;
+            }
+        }
+
+    }
+    return 0;
+}
+
+#define NUM_CLIENTS 2
+
+
+int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, int* client_index){
+    // This function is used to wait for completions from multiple clients and return the index of the client
+    // that completed
+
+    int rcnt = 0, scnt = 0;
+    while (rcnt + scnt < iters) {
+        struct ibv_wc wc[WC_BATCH];
+        int ne, i;
+
+        do {
+            for (int index = 0; index < NUM_CLIENTS; index++){
+                ne = ibv_poll_cq(ctx_list[index]->cq, WC_BATCH, wc);
+                if (ne < 0) {
+                    fprintf(stderr, "poll CQ failed %d\n", ne);
+                    return 1;
+                }
+                if (ne > 0){
+                    *client_index = index;
+                    break;
+                }
+            }
+        } while (ne < 1);
+
+
+        struct pingpong_context *ctx = ctx_list[*client_index];
+        for (i = 0; i < ne; ++i) {
+            if (wc[i].status != IBV_WC_SUCCESS) {
+                fprintf(stderr, "Failed status %s (%d) for wr_id %d\n",
+                        ibv_wc_status_str(wc[i].status),
+                        wc[i].status, (int) wc[i].wr_id);
+                return 1;
+            }
+
+            switch ((int) wc[i].wr_id) {
+                case PINGPONG_SEND_WRID:
+                    ++scnt;
+                    break;
+
+                case PINGPONG_RECV_WRID:
+                    if (--ctx->routs <= 10) {
+                        ctx->routs += pp_post_recv(ctx, ctx->rx_depth - ctx->routs);
+                        if (ctx->routs < ctx->rx_depth) {
+                            fprintf(stderr,
+                                    "Couldn't post receive (%d)\n",
+                                    ctx->routs);
+                            return 1;
+                        }
+                    }
+                    ++rcnt;
+                    break;
+
+                default:
+                    fprintf(stderr, "Completion for unknown wr_id %d\n",
+                            (int) wc[i].wr_id);
+                    return 1;
             }
         }
 

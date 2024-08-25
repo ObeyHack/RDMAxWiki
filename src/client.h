@@ -22,6 +22,6 @@ int kv_close(void *kv_handle); /* Destroys the QP */
 
 ////// Server functions
 
-bool receive_query(Database* db, kvHandle* kv_handle);
+bool receive_query(Database* db, kvHandle** kv_handle);
 
 #endif //_CLIENT_H_
