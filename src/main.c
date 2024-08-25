@@ -51,7 +51,7 @@ void test_double_client(char* servername){
 }
 
 void test_connection(char* servername, kvHandle** kv_handle_ptr){
-    printf(BLUE "Test 1: Connection\n" BASE);
+    printf(BLUE "Test: Connection\n" BASE);
 
     bool result = kv_open(servername, (void **) kv_handle_ptr);
     if (result == EXIT_FAILURE) {
@@ -63,9 +63,20 @@ void test_connection(char* servername, kvHandle** kv_handle_ptr){
     printf(GREEN "Test 1: Passed\n" BASE);
 }
 
+void test_disconnection(kvHandle* kv_handle){
+    printf(BLUE "Test: Disconnection\n" BASE);
+
+    bool result = kv_close(kv_handle);
+    if (result == EXIT_FAILURE) {
+        printf(RED "Test: Failed\n" BASE);
+        return;
+    }
+
+    printf(GREEN "Test: Passed\n" BASE);
+}
+
 void test_2(kvHandle* kv_handle){
     printf(BLUE "Test 2: Set and Get in Eager mode\n" BASE);
-
 
     // Set + Get
     char* key = "key";
@@ -289,15 +300,26 @@ void run_tests(char* servername){
     printf(GOLD "Running tests\n" BASE);
     kvHandle *kv_handle;
     test_connection(servername, &kv_handle);
+    sleep(8);
 
     test_2(kv_handle);
+    sleep(2);
     test_3(kv_handle);
+    sleep(2);
     test_4(kv_handle);
+    sleep(2);
     test_5(kv_handle);
+    sleep(2);
     test_6(kv_handle);
+    sleep(2);
     test_7(kv_handle);
+    sleep(2);
     test_8(kv_handle);
+    sleep(2);
     test_9(kv_handle);
+
+    sleep(8);
+    test_disconnection(kv_handle);
 }
 
 

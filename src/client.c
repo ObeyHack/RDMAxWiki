@@ -311,7 +311,7 @@ bool receive_query(Database* db, kvHandle** kv_handle){
 
     // wait for completions
     int client_index;
-    if (pp_wait_completions_clients(ctx_list, NUM_CLIENTS,
+    if (pp_wait_completions_clients(ctx_list, 1,
             &client_index) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
