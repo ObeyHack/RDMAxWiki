@@ -590,7 +590,7 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters)
     return 0;
 }
 
-#define NUM_CLIENTS 1
+#define NUM_CLIENTS 2
 int prev_index = 0;
 
 int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, int* client_index){
@@ -834,8 +834,8 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
 }
 
 
-#define MSG_COUNT 1
-#define WARMUP_CYCLES 1
+#define MSG_COUNT 2
+#define WARMUP_CYCLES 2
 
 double calc_throughput(struct timeval start, struct timeval end, int data_size){
     long second2micro = (end.tv_sec - start.tv_sec) * 1000000;

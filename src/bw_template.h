@@ -38,9 +38,9 @@ struct pingpong_context {
 #define PORT 8543
 #define KB 1024
 #define BUF_SIZE 4096
-#define NUM_CLIENTS 1
-#define MSG_COUNT 3
-#define WARMUP_CYCLES 3
+#define NUM_CLIENTS 2
+#define MSG_COUNT 2
+#define WARMUP_CYCLES 2
 
 
 static struct pingpong_context *pp_init_ctx(struct ibv_device *ib_dev, int size,
