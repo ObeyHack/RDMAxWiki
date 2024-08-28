@@ -281,18 +281,44 @@ void test_9(kvHandle* kv_handle){
     printf(GREEN "Test 9: Passed\n" BASE);
 }
 
-
-void test_throughout(char* servername){
-    printf(PURPLE "Test throughout: Set and Get in Eager mode\n" BASE);
-
-    // open connection
-    kvHandle* kv_handle;
-    bool result = kv_open(servername, (void **) &kv_handle);
-    if (result == EXIT_FAILURE) {
-        printf(RED "Test throughout: Failed\n" BASE);
-        return;
+int send_data_kv_set(kvHandle* kv_handle, int iters, const char *key, char *value){
+    // set data size to send in ctx
+    int i;
+    for (i = 0; i < iters; i++) {
+        if (kv_set(kv_handle, key, value) != 0){
+            fprintf(stderr, "Client couldn't post send\n");
+            return EXIT_FAILURE;
+        }
     }
+    return EXIT_SUCCESS;
+}
 
+
+void test_throughout(kvHandle* kv_handle){
+    printf(PURPLE "Test throughout: Set Eager mode\n" BASE);
+
+    // Set
+    char* key = "key";
+    char* value;
+    double* throughputs = (double*) malloc((MEGA_POWER+1) * sizeof(double));
+    int index = 0;
+    struct timeval start, end;
+    for (int i = 1; i <= MEGABIT; i <<= 1) {
+        value = (char*)malloc(i);
+        memset(value, 'a', i);
+        value[i] = '\0';
+        // warm up
+        send_data_kv_set(kv_handle,  WARMUP_CYCLES, key, value);
+        // measure
+        gettimeofday(&start, NULL);
+        send_data_kv_set(kv_handle, MSG_COUNT, key, value);
+        gettimeofday(&end, NULL);
+        throughputs[index] = calc_throughput(start, end, i);
+        // print throughput
+        printf("%d\t%f\tMbit/s\n", i, throughputs[index]);
+        free(value);
+        index++;
+    }
 
 }
 
@@ -300,59 +326,81 @@ void run_tests(char* servername){
     printf(GOLD "Running tests\n" BASE);
     kvHandle *kv_handle;
     test_connection(servername, &kv_handle);
-    sleep(8);
+    sleep(2);
 
-    test_2(kv_handle);
-    sleep(2);
-    test_3(kv_handle);
-    sleep(2);
-    test_4(kv_handle);
-    sleep(2);
-    test_5(kv_handle);
-    sleep(2);
-    test_6(kv_handle);
-    sleep(2);
-    test_7(kv_handle);
-    sleep(2);
-    test_8(kv_handle);
-    sleep(2);
-    test_9(kv_handle);
+    test_throughout(kv_handle);
 
-    sleep(8);
+//    test_2(kv_handle);
+//    sleep(2);
+//    test_3(kv_handle);
+//    sleep(2);
+//    test_4(kv_handle);
+//    sleep(2);
+//    test_5(kv_handle);
+//    sleep(2);
+//    test_6(kv_handle);
+//    sleep(2);
+//    test_7(kv_handle);
+//    sleep(2);
+//    test_8(kv_handle);
+//    sleep(2);
+//    test_9(kv_handle);
+//
+//    sleep(8);
     test_disconnection(kv_handle);
 }
 
 
-
-bool execute_query(kvHandle* kv_handle, char* line){
+bool execute_query(kvHandle *kv_handle, char *line) {
     /*
      * Parse the line and execute the query. Format:
      * se:key:value
      * sr:key:valueSize
      * ge:key:x
      */
-    char* flag;
-    char* key;
-    char* value;
-    sscanf(line, "%s:%s:%s", flag, key, value);
+    char flag[3];
+    char key[256];
+    char value[256];
+    sscanf(line, "%2[^:]:%255[^:]:%255[^\n]", flag, key, value);// bug here
+    if (flag == NULL || key == NULL || value == NULL) {
+        return EXIT_FAILURE;
+    }
+    if (flag[0] == 's' && flag[1] == 'e') {
+        return kv_set(kv_handle, key, value);
+    } else if (flag[0] == 's' && flag[1] == 'r') {
+        int value_size;
+        sscanf(line, "%s:%s:%d", flag, key, &value_size);
+        char *value_sr = (char *) malloc(value_size);
+        memset(value_sr, 'a', value_size);
+        value_sr[value_size] = '\0';
+        bool result = kv_set(kv_handle, key, value_sr);
+        free(value_sr);
+        return result;
+
+    } else if (flag[0] == 'g' && flag[1] == 'e') {
+        char *value_retrieved;
+        return kv_get(kv_handle, key, &value_retrieved);
+    }
+    return EXIT_FAILURE;
+
 }
 
-void parse_input(char* servername, char* input_file){
+void parse_input(char* servername, char *input_file) {
     /*
      * Parse the input file and execute the queries.
      */
-    FILE* file = fopen(input_file, "r");
+    FILE *file = fopen(input_file, "r");
     if (file == NULL) {
         printf(RED "Error opening file\n" BASE);
         return;
     }
-    char* line = NULL;
+    char *line = NULL;
     size_t len = 0;
     ssize_t read;
 
     // open connection
-    kvHandle* kv_handle;
-    kv_open("localhost", (void**)&kv_handle);
+    kvHandle *kv_handle;
+    kv_open(servername, (void **) &kv_handle);// here should be servername
 
     while ((read = getline(&line, &len, file)) != -1) {
         if (execute_query(kv_handle, line) == EXIT_FAILURE) {
@@ -368,6 +416,10 @@ void parse_input(char* servername, char* input_file){
 int main(int argc, char *argv[]) {
     char* servername = argv[1];
     kvHandle* kv_handle;
+
+    if (argc == 3) {
+        parse_input(servername, argv[2]);
+    }
 
     if (argc == 2) {
         run_tests(servername);

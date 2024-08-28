@@ -45,7 +45,6 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <time.h>
-
 #include <infiniband/verbs.h>
 
 #define WC_BATCH (10)
@@ -591,9 +590,9 @@ int pp_wait_completions(struct pingpong_context *ctx, int iters)
     return 0;
 }
 
-#define NUM_CLIENTS 2
-
+#define NUM_CLIENTS 1
 int prev_index = 0;
+
 int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, int* client_index){
     // This function is used to wait for completions from multiple clients and return the index of the client
     // that completed
@@ -721,7 +720,7 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
     int                      port = PORT;
     int                      ib_port = 1;
     enum ibv_mtu             mtu = IBV_MTU_2048;
-    int                      rx_depth = 100;
+    int                      rx_depth = 10000;
     int                      tx_depth = 100;
     int                      iters = 1000;
     int                      use_event = 0;
@@ -835,8 +834,8 @@ int init_connection(char* servername, struct pingpong_context** ctx_p)
 }
 
 
-#define MSG_COUNT 1000
-#define WARMUP_CYCLES 700
+#define MSG_COUNT 1
+#define WARMUP_CYCLES 1
 
 double calc_throughput(struct timeval start, struct timeval end, int data_size){
     long second2micro = (end.tv_sec - start.tv_sec) * 1000000;

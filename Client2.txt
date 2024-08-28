@@ -1,0 +1,4 @@
+se:key1:value1
+sr:key2:a*4100
+se:key2:value2
+g:key2:x

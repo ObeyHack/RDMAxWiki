@@ -38,7 +38,9 @@ struct pingpong_context {
 #define PORT 8543
 #define KB 1024
 #define BUF_SIZE 4096
-#define NUM_CLIENTS 2
+#define NUM_CLIENTS 1
+#define MSG_COUNT 3
+#define WARMUP_CYCLES 3
 
 
 static struct pingpong_context *pp_init_ctx(struct ibv_device *ib_dev, int size,
@@ -62,5 +64,7 @@ int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, i
 int init_connection(char* servername, struct pingpong_context** ctx_p);
 
 int pp_post_rdma_send(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey);
+
+double calc_throughput(struct timeval start, struct timeval end, int data_size);
 
 #endif //WORKSHOP_NETWORK_EX3_BW_TEMPLATE_H

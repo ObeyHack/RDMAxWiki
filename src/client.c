@@ -50,6 +50,12 @@ bool client_set_eager(void *kv_handle, const char *key, const char *value){
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
+
+    // wait for ACK
+    if (pp_wait_completions(&ctx, 1) == EXIT_FAILURE){
+        fprintf(stderr, "Client couldn't wait for completions\n");
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 
@@ -229,6 +235,10 @@ bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value)
     if (set_item(db, key, value_struct) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
+    // send ACK
+    if (send_ACK(kv_handle) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 
@@ -236,8 +246,12 @@ bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value)
 /////////// Receive Query  /////////////
 
 bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
+//    char buffer[4*KB];
+//    strcpy(buffer, buf);
+
+    char* buffer = buf;
     // Data format: flag:key:x
-    char* flag = strtok(buf, ":");
+    char* flag = strtok(buffer, ":");
 
     if (strlen(flag) != 2){
         return EXIT_FAILURE;
@@ -341,7 +355,7 @@ int kv_open(char *servername, void **kv_handle){
 }
 
 int kv_set(void *kv_handle, const char *key, const char *value){
-    printf("Setting value for key: %s\n", key);
+//    printf("Setting value for key: %s\n", key);
     // Flag = {get, set}
     if (strlen(value) < 4*KB-3){
         // send rendezvous control message
@@ -358,7 +372,7 @@ int kv_set(void *kv_handle, const char *key, const char *value){
 }
 
 int kv_get(void *kv_handle, const char *key, char **value){
-    printf("Getting value for key: %s\n", key);
+//    printf("Getting value for key: %s\n", key);
 
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     // 1. send get message. Format: "g0:key\0"
