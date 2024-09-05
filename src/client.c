@@ -78,13 +78,17 @@ bool client_set_rendezvous(void *kv_handle, const char *key, const char *value){
         return EXIT_FAILURE;
     }
 
-    // 3. send memory region, Format: "rkey:addr\0"
-    sprintf(ctx.buf, "%u:%lu", mr->rkey, (u_int64_t) mr->addr);
-    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+
+    // 3. Receive msg from server. Format: "rkey:addr\0"
+    uint64_t r_addr;
+    uint32_t rkey;
+    pp_wait_completions(&ctx, 1);
+    sscanf(ctx.buf, "%u:%lu", &rkey, &r_addr);
+
+    // 4. Write the value to the server
+    if (pp_post_rdma_write(&ctx, mr, r_addr, rkey) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
-
-    // 4. Wait for ACK
     pp_wait_completions(&ctx, 1);
 
     // 5. Deregister memory
@@ -119,15 +123,10 @@ bool client_get_rendezvous(void *kv_handle, const char *key, char **value, int s
     sscanf(ctx.buf, "%u:%lu", &rkey, &r_addr);
 
     // 4. Read the value from the server
-    if (pp_post_rdma_send(&ctx, mr, r_addr, rkey) == EXIT_FAILURE){
+    if (pp_post_rdma_read(&ctx, mr, r_addr, rkey) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
     pp_wait_completions(&ctx, 1);
-
-    // 5. Send ACK
-    if (send_ACK(kv_handle) == EXIT_FAILURE){
-        return EXIT_FAILURE;
-    }
 
     // 6. De-register memory
     if (ibv_dereg_mr(mr)){
@@ -159,8 +158,6 @@ bool server_get_rendezvous(Database* db, kvHandle* kv_handle, Value* value){
         return EXIT_FAILURE;
     }
 
-    // 3. Wait for ACK
-    pp_wait_completions(&ctx, 1);
     return EXIT_SUCCESS;
 }
 
@@ -190,19 +187,13 @@ bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int val
         return EXIT_FAILURE;
     }
 
-    // 3. Receive msg from client. Format: "rkey:addr\0"
-    uint64_t r_addr;
-    uint32_t rkey;
-    pp_wait_completions(&ctx, 1);
-    sscanf(ctx.buf, "%u:%lu", &rkey, &r_addr);
-
-    // 4. Read the value from the client
-    if (pp_post_rdma_send(&ctx, mr, r_addr, rkey) == EXIT_FAILURE){
+    // 3. send memory region, Format: "rkey:addr\0"
+    sprintf(ctx.buf, "%u:%lu", mr->rkey, (u_int64_t) mr->addr);
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
-    pp_wait_completions(&ctx, 1);
 
-    // 5. Set the item in the database
+    // 4. Set the item in the database
     Value *value_struct = (Value *) malloc(sizeof(Value));
     if (value_struct == NULL) {
         return EXIT_FAILURE;
@@ -212,11 +203,6 @@ bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int val
     value_struct->is_large = true;
     value_struct->mr = mr;
     if (set_item(db, key, value_struct) == EXIT_FAILURE){
-        return EXIT_FAILURE;
-    }
-
-    // 6. Send ACK
-    if (send_ACK(kv_handle) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 

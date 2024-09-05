@@ -659,7 +659,7 @@ int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, i
 }
 
 
-int pp_post_rdma_send(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey)
+int pp_post_rdma_read(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey)
 {
     struct ibv_sge list = {
             .addr	= (uint64_t)l_mr->addr,
@@ -680,6 +680,29 @@ int pp_post_rdma_send(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_
 
     return ibv_post_send(ctx->qp, &wr, &bad_wr);
 }
+
+int pp_post_rdma_write(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey)
+{
+    struct ibv_sge list = {
+            .addr	= (uint64_t)l_mr->addr,
+            .length = l_mr->length,
+            .lkey	= l_mr->lkey
+    };
+
+    struct ibv_send_wr *bad_wr, wr = {
+            .wr_id	    = PINGPONG_SEND_WRID,
+            .sg_list    = &list,
+            .num_sge    = 1,
+            .opcode     = IBV_WR_RDMA_WRITE,
+            .send_flags = IBV_SEND_SIGNALED,
+            .next       = NULL,
+            .wr.rdma.remote_addr = r_addr,
+            .wr.rdma.rkey = rkey
+    };
+
+    return ibv_post_send(ctx->qp, &wr, &bad_wr);
+}
+
 
 
 static void usage(const char *argv0)

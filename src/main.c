@@ -331,19 +331,19 @@ void run_tests(char* servername){
 //    test_throughout(kv_handle);
 
     test_2(kv_handle);
-    sleep(2);
+//    sleep(2);
     test_3(kv_handle);
-    sleep(2);
+//    sleep(2);
     test_4(kv_handle);
-    sleep(2);
+//    sleep(2);
     test_5(kv_handle);
-    sleep(2);
+//    sleep(2);
     test_6(kv_handle);
-    sleep(2);
+//    sleep(2);
     test_7(kv_handle);
-    sleep(2);
+//    sleep(2);
     test_8(kv_handle);
-    sleep(2);
+//    sleep(2);
     test_9(kv_handle);
 
     sleep(8);

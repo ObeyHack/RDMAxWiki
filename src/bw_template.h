@@ -63,7 +63,9 @@ int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, i
 
 int init_connection(char* servername, struct pingpong_context** ctx_p);
 
-int pp_post_rdma_send(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey);
+int pp_post_rdma_read(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey);
+
+int pp_post_rdma_write(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey);
 
 double calc_throughput(struct timeval start, struct timeval end, int data_size);
 
