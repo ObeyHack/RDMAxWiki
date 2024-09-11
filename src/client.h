@@ -6,7 +6,8 @@
 #include "database.h"
 
 typedef struct kv_handle {
-    struct pingpong_context ctx;
+    struct pingpong_context* ctx;
+    int client_id;
 }kvHandle;
 
 

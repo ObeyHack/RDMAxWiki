@@ -332,8 +332,11 @@ bool receive_query(Database* db, kvHandle** kv_handle){
 ////////////////////////// API Functions //////////////////////////
 
 int kv_open(char *servername, void **kv_handle){
-    struct pingpong_context** ctx_p = (struct pingpong_context**)kv_handle;
-    if (init_connection(servername, ctx_p) == EXIT_FAILURE){
+    kvHandle* handle = (kvHandle*)(*kv_handle);
+
+    struct pingpong_context** ctx_p = (struct pingpong_context**)()
+    int client_num;
+    if (init_connection(servername, ctx_p, &client_num) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
     printf("Opening connection to server %s\n", servername);
