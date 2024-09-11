@@ -9,6 +9,96 @@ bool create_database(Database** db_p){
     *db_p = db;
     return EXIT_SUCCESS;
 }
+bool get_num_in_set(Database* db, const char* key, int* num_in_set)
+{
+    Node* current = db->head;
+    while (current != NULL)
+    {
+        if (strcmp(current->data->key, key) == 0)
+        {
+            *num_in_set = current->data->num_in_set;
+            return EXIT_SUCCESS;
+        }
+        current = current->next;
+    }
+    return EXIT_FAILURE;
+
+}
+
+bool get_num_in_get(Database *db, const char *key, int *num_in_get) {
+    Node* current = db->head;
+    while (current != NULL)
+    {
+        if (strcmp(current->data->key, key) == 0)
+        {
+            *num_in_get = current->data->num_in_get;
+            return EXIT_SUCCESS;
+        }
+        current = current->next;
+    }
+    return EXIT_FAILURE;
+
+}
+
+bool add_num_in_set(Database *db, const char *key)
+{
+    Node* current = db->head;
+    while (current != NULL)
+    {
+        if (strcmp(current->data->key, key) == 0)
+        {
+            current->data->num_in_set++;
+            return EXIT_SUCCESS;
+        }
+        current = current->next;
+    }
+    return EXIT_FAILURE;
+}
+
+bool add_num_in_get(Database *db, const char *key)
+{
+    Node* current = db->head;
+    while (current != NULL)
+    {
+        if (strcmp(current->data->key, key) == 0)
+        {
+            current->data->num_in_get++;
+            return EXIT_SUCCESS;
+        }
+        current = current->next;
+    }
+    return EXIT_FAILURE;
+}
+
+bool remove_num_in_set(Database *db, const char *key)
+{
+    Node* current = db->head;
+    while (current != NULL)
+    {
+        if (strcmp(current->data->key, key) == 0)
+        {
+            current->data->num_in_set--;
+            return EXIT_SUCCESS;
+        }
+        current = current->next;
+    }
+    return EXIT_FAILURE;
+}
+
+bool remove_num_in_get(Database *db, const char *key)
+{
+    Node* current = db->head;
+    while (current != NULL)
+    {
+        if (strcmp(current->data->key, key) == 0)
+        {
+            current->data->num_in_get--;
+            return EXIT_SUCCESS;
+        }
+        current = current->next;
+    }
+    return EXIT_FAILURE;
+}
 
 bool _add_item(Database* db, char* key, Value* value) {
     Item *item = (Item *) malloc(sizeof(Item));

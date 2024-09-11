@@ -11,35 +11,45 @@
 #define KB 1024
 
 typedef struct Value {
-    char* value;
+    char *value;
     int size;
     bool is_large;
-    struct ibv_mr* mr;
+    struct ibv_mr *mr;
 } Value;
 
 typedef struct item {
-    char key[4*KB];
-    Value* value;
+    char key[4 * KB];
+    Value *value;
+    int num_in_set;
+    int num_in_get;
 } Item;
 
 typedef struct node {
-    Item* data;
-    struct node* next;
+    Item *data;
+    struct node *next;
 } Node;
 
 typedef struct database {
-    Node* head;
+    Node *head;
 } Database;
 
+bool get_num_in_set(Database *db, const char *key, int *num_in_set);
 
+bool get_num_in_get(Database *db, const char *key, int *num_in_get);
 
-bool create_database(Database** db);
+bool add_num_in_set(Database *db, const char *key);
 
-bool set_item(Database* db, const char* key, Value* value);
+bool add_num_in_get(Database *db, const char *key);
 
-bool get_value(Database* db, const char* key, Value** value_p);
+bool remove_num_in_set(Database *db, const char *key);
 
+bool remove_num_in_get(Database *db, const char *key);
 
+bool create_database(Database **db);
+
+bool set_item(Database *db, const char *key, Value *value);
+
+bool get_value(Database *db, const char *key, Value **value_p);
 
 
 #endif //WORKSHOP_NETWORK_EX3_DATABASE_H

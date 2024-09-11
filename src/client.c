@@ -168,7 +168,10 @@ bool server_get_eager(kvHandle* kv_handle, Value* value){
     return EXIT_SUCCESS;
 }
 
-
+bool server_get_FIN(Database* db, kvHandle* kv_handle, char* key){
+    //decrease the num_in_get
+    remove_num_in_get(db, key);
+}
 /////////// Set Server  /////////////
 
 bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int value_size){
@@ -228,8 +231,14 @@ bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value)
     return EXIT_SUCCESS;
 }
 
-
+bool server_set_FIN(Database* db, kvHandle* kv_handle, char* key){
+    // decrease the num_in_set
+    remove_num_in_set(db, key);
+}
 /////////// Receive Query  /////////////
+//send again buffer
+char *send_again_buffer[256];
+int send_again_index = 0;
 
 bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
 //    char buffer[4*KB];
@@ -248,53 +257,85 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     char key[4*KB];
     strcpy(key, strtok(NULL, ":"));
 
-    //////////////////////// Set Eager ////////////////////////
-    if (strcmp(flag, "se")==0){
-        printf("Eager set\n");
-        char* value = strtok(NULL, ":");
-        char* copy = (char*)malloc(strlen(value) + 1);
-        if (copy == NULL){
+
+    if (strcmp(flag, "se")==0||strcmp(flag, "sr")==0) {
+        //check num_in_set is zero
+        int num_in_set;
+        if (get_num_in_set(db, key, &num_in_set) == EXIT_FAILURE) {
             return EXIT_FAILURE;
         }
-        strcpy(copy, value);
-        if (server_set_eager(db, kv_handle, key, copy) == EXIT_FAILURE){
+        if (num_in_set != 0) {
+            // now we want to add the buf to a buffer that saves the messages that we need to send again
+            return EXIT_FAILURE;
+        }
+        //////////////////////// Set Eager ////////////////////////
+        if (strcmp(flag, "se") == 0) {
+            printf("Eager set\n");
+            char *value = strtok(NULL, ":");
+            char *copy = (char *) malloc(strlen(value) + 1);
+            if (copy == NULL) {
+                return EXIT_FAILURE;
+            }
+            strcpy(copy, value);
+            if (server_set_eager(db, kv_handle, key, copy) == EXIT_FAILURE) {
+                return EXIT_FAILURE;
+            }
+            return EXIT_SUCCESS;
+        }
+
+        //////////////////////// Set Rendezvous ////////////////////////
+        else if (strcmp(flag, "sr") == 0) {
+            printf("Rendezvous set\n");
+            char *size = strtok(NULL, ":");
+            int size_int = atoi(size);
+            if (server_set_rendezvous(db, kv_handle, key, size_int) == EXIT_FAILURE) {
+                return EXIT_FAILURE;
+            }
+            return EXIT_SUCCESS;
+        }
+    }
+
+    //if FIN SET message
+    else if (strcmp(flag, "fs")==0){
+        printf("FIN SET\n");
+        if (server_set_FIN(db, kv_handle, key) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
     }
-
-    //////////////////////// Set Rendezvous ////////////////////////
-    else if (strcmp(flag, "sr")==0){
-        printf("Rendezvous set\n");
-        char* size = strtok(NULL, ":");
-        int size_int = atoi(size);
-        if (server_set_rendezvous(db, kv_handle, key, size_int) == EXIT_FAILURE){
-            return EXIT_FAILURE;
-        }
-        return EXIT_SUCCESS;
-    }
-
     Value* value;
-
-    if (get_value(db, key, &value) == EXIT_FAILURE){
-        return EXIT_FAILURE;
-    }
-
-    //////////////////////// Get Eager ////////////////////////
-    if (value->is_large == false){
-        printf("Eager get\n");
-        if (server_get_eager(kv_handle, value) == EXIT_FAILURE){
+    else if (strcmp(flag, "g0")==0){
+        printf("Get\n");
+        if (get_value(db, key, &value) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
-    }
 
-        //////////////////////// Get Rendezvous ////////////////////////
-    else{
-        printf("Rendezvous get\n");
-        if (server_get_rendezvous(db, kv_handle, value) == EXIT_FAILURE){
+        //////////////////////// Get Eager ////////////////////////
+        if (value->is_large == false){
+            printf("Eager get\n");
+            if (server_get_eager(kv_handle, value) == EXIT_FAILURE){
+                return EXIT_FAILURE;
+            }
+        }
+
+            //////////////////////// Get Rendezvous ////////////////////////
+        else{
+            printf("Rendezvous get\n");
+            if (server_get_rendezvous(db, kv_handle, value) == EXIT_FAILURE){
+                return EXIT_FAILURE;
+            }
+        }
+        return EXIT_SUCCESS;
+    }
+    //if FIN GET message
+    else if (strcmp(flag, "fg")==0){
+        printf("FIN GET\n");
+        if (server_get_FIN(db, kv_handle, key) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
+        return EXIT_SUCCESS;
     }
+
     return EXIT_SUCCESS;
 }
 
@@ -354,6 +395,13 @@ int kv_set(void *kv_handle, const char *key, const char *value){
             return EXIT_FAILURE;
         }
     }
+    //send FIN SET message
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
+    char* flag = "fs";
+    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
 
@@ -385,6 +433,12 @@ int kv_get(void *kv_handle, const char *key, char **value){
         if (client_get_rendezvous(kv_handle, key, value, size) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
+    }
+    //send FIN GET message
+    char* flag = "fg";
+    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+        return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
 }
