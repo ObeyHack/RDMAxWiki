@@ -2,8 +2,8 @@
 
 ////////////////////////// Helper Functions ////////////////////////////////////
 
-bool send_data_str(kvHandle* kv_handle, char* buf){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+bool send_data_str(void *kv_handle, char* buf){
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     ctx.buf = buf;
     ctx.size = (int) strlen(buf) + 1;
 
@@ -25,7 +25,7 @@ bool send_data_str(kvHandle* kv_handle, char* buf){
 }
 
 bool send_ACK(kvHandle* kv_handle){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     unsigned int ctx_flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
     int size = ctx.size;
     ctx.size = 1;
@@ -40,8 +40,8 @@ bool send_ACK(kvHandle* kv_handle){
 
 ////////////////////////// Client Functions ////////////////////////////////////
 
-bool client_set_eager(kvHandle* kv_handle, const char *key, const char *value){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+bool client_set_eager(void *kv_handle, const char *key, const char *value){
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     // send eager message
     char* flag = "se";
     sprintf(ctx.buf, "%s:%s:%s%c", flag, key, value, '\0');
@@ -59,8 +59,8 @@ bool client_set_eager(kvHandle* kv_handle, const char *key, const char *value){
     return EXIT_SUCCESS;
 }
 
-bool client_set_rendezvous(kvHandle* kv_handle, const char *key, const char *value){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+bool client_set_rendezvous(void *kv_handle, const char *key, const char *value){
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
 
     // 1. send malloc size, Format: "sr:key:valueSize\0"
     char* msg_size = (char*)malloc(10);
@@ -99,8 +99,8 @@ bool client_set_rendezvous(kvHandle* kv_handle, const char *key, const char *val
     return EXIT_SUCCESS;
 }
 
-bool client_get_rendezvous(kvHandle* kv_handle, const char *key, char **value, int size){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+bool client_get_rendezvous(void *kv_handle, const char *key, char **value, int size){
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
 
     // 1. malloc a buffer of size value_size
     char* value_buf = (char*)malloc(size + 1);
@@ -144,7 +144,7 @@ bool client_get_rendezvous(kvHandle* kv_handle, const char *key, char **value, i
 /////////// Get Server  /////////////
 
 bool server_get_rendezvous(Database* db, kvHandle* kv_handle, Value* value){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
 
     // 1. send malloc size, Format: "r:valueSize\0"
     sprintf(ctx.buf, "r:%d", value->size);
@@ -162,11 +162,9 @@ bool server_get_rendezvous(Database* db, kvHandle* kv_handle, Value* value){
 }
 
 bool server_get_eager(kvHandle* kv_handle, Value* value){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     sprintf(ctx.buf, "e:%s", value->value);
-    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
-        return EXIT_FAILURE;
-    }
+    send_data_str(kv_handle, ctx.buf);
     return EXIT_SUCCESS;
 }
 
@@ -174,7 +172,7 @@ bool server_get_eager(kvHandle* kv_handle, Value* value){
 /////////// Set Server  /////////////
 
 bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int value_size){
-    struct pingpong_context ctx = *(kv_handle->ctx);
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
 
     // 1. malloc a buffer of size value_size
     char* value = (char*)malloc(value_size + 1);
@@ -307,7 +305,7 @@ bool receive_query(Database* db, kvHandle** kv_handle){
     struct pingpong_context* ctx;
     for (int i = 0; i < NUM_CLIENTS; i++){
         handle = kv_handle[i];
-        ctx = handle->ctx;
+        ctx = (struct pingpong_context*)handle;
         ctx_list[i] = ctx;
     }
 
@@ -320,7 +318,7 @@ bool receive_query(Database* db, kvHandle** kv_handle){
     printf("Handling query from client %d\n", client_index);
 
     handle = kv_handle[client_index];
-    ctx = handle->ctx;
+    ctx = (struct pingpong_context*)handle;
 
     // Parse data
     if (parse_data(db, handle, ctx->buf) == EXIT_FAILURE){
@@ -334,25 +332,8 @@ bool receive_query(Database* db, kvHandle** kv_handle){
 ////////////////////////// API Functions //////////////////////////
 
 int kv_open(char *servername, void **kv_handle){
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    kvHandle* handle = (kvHandle*)(*kv_handle);
-    struct pingpong_context** ctx_p = &handle->ctx;
-    int client_num;
-    if (init_connection(servername, ctx_p, &client_num) == EXIT_FAILURE){
-=======
     struct pingpong_context** ctx_p = (struct pingpong_context**)kv_handle;
     if (init_connection(servername, ctx_p) == EXIT_FAILURE){
->>>>>>> parent of 8c3ec69 (db change)
-=======
-    struct pingpong_context** ctx_p = (struct pingpong_context**)kv_handle;
-    if (init_connection(servername, ctx_p) == EXIT_FAILURE){
->>>>>>> parent of 8c3ec69 (db change)
-=======
-    struct pingpong_context** ctx_p = (struct pingpong_context**)kv_handle;
-    if (init_connection(servername, ctx_p) == EXIT_FAILURE){
->>>>>>> parent of 8c3ec69 (db change)
         return EXIT_FAILURE;
     }
     printf("Opening connection to server %s\n", servername);
@@ -360,18 +341,16 @@ int kv_open(char *servername, void **kv_handle){
 }
 
 int kv_set(void *kv_handle, const char *key, const char *value){
-    // printf("Setting value for key: %s\n", key);
+//    printf("Setting value for key: %s\n", key);
     // Flag = {get, set}
-    kvHandle* handle = (kvHandle*)(kv_handle);
-
     if (strlen(value) < 4*KB-3){
         // send rendezvous control message
-        if (client_set_eager(handle, key, value) == EXIT_FAILURE){
+        if (client_set_eager(kv_handle, key, value) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
     }
     else{
-        if (client_set_rendezvous(handle, key, value) == EXIT_FAILURE){
+        if (client_set_rendezvous(kv_handle, key, value) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
     }
@@ -380,12 +359,12 @@ int kv_set(void *kv_handle, const char *key, const char *value){
 
 int kv_get(void *kv_handle, const char *key, char **value){
 //    printf("Getting value for key: %s\n", key);
-    kvHandle* handle = (kvHandle*)(kv_handle);
-    struct pingpong_context ctx = *handle->ctx;
+
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     // 1. send get message. Format: "g0:key\0"
     char* flag = "g0";
     sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
-    if (send_data_str(handle, ctx.buf) == EXIT_FAILURE){
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 
@@ -403,7 +382,7 @@ int kv_get(void *kv_handle, const char *key, char **value){
         // Malloc size of the value. Format: "r:size"
         int size;
         sscanf(buf, "r:%d", &size);
-        if (client_get_rendezvous(handle, key, value, size) == EXIT_FAILURE){
+        if (client_get_rendezvous(kv_handle, key, value, size) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
     }
@@ -418,8 +397,7 @@ void kv_release(char *value){
 
 /* Destroys the QP */
 int kv_close(void *kv_handle){
-    kvHandle* handle = (kvHandle*)(kv_handle);
-    struct pingpong_context* ctx = handle->ctx;
+    struct pingpong_context* ctx = (struct pingpong_context*)kv_handle;
     if (pp_close_ctx(ctx) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
