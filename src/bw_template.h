@@ -61,7 +61,7 @@ int pp_wait_completions_clients(struct pingpong_context **ctx_list, int iters, i
 
 
 
-int init_connection(char* servername, struct pingpong_context** ctx_p, int* client_num_p);
+int init_connection(char* servername, struct pingpong_context** ctx_p);
 
 int pp_post_rdma_read(struct pingpong_context *ctx, struct ibv_mr* l_mr, uint64_t r_addr, uint32_t rkey);
 

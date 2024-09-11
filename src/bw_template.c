@@ -733,9 +733,7 @@ static void usage(const char *argv0)
 int server(struct pingpong_context *ctx);
 int client(struct pingpong_context *ctx, int tx_depth);
 
-int client_number = 0;
-
-int init_connection(char* servername, struct pingpong_context** ctx_p, int* client_num_p)
+int init_connection(char* servername, struct pingpong_context** ctx_p)
 {
     struct ibv_device      **dev_list;
     struct ibv_device       *ib_dev;
@@ -840,8 +838,6 @@ int init_connection(char* servername, struct pingpong_context** ctx_p, int* clie
     if (!rem_dest)
         return EXIT_FAILURE;
 
-    *(client_num_p) = client_number;
-    client_number++;
 
 //    printf("  remote address: LID 0x%04x, QPN 0x%06x, PSN 0x%06x, GID %s\n",
 //           rem_dest->lid, rem_dest->qpn, rem_dest->psn, gid);

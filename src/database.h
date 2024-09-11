@@ -7,10 +7,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include "infiniband/verbs.h"
-#include "bw_template.h"
 
 #define KB 1024
-
 
 typedef struct Value {
     char* value;
@@ -19,39 +17,19 @@ typedef struct Value {
     struct ibv_mr* mr;
 } Value;
 
-
-typedef struct value_node {
-    Value* data;
-    struct db_node* next;
-} ValueNode;
-
-typedef struct value_linkList {
-    ValueNode* head;
-} ValuesList;
-
-
-typedef struct db_item {
+typedef struct item {
     char key[4*KB];
+    Value* value;
+} Item;
 
-    int num_reads;
-    // link list of values for readers
-    ValuesList* values;
-
-    // array of size NUM_CLIENTS, each element is a pointer to a Value struct
-    Value* progress[NUM_CLIENTS];
-} DBItem;
-
-typedef struct db_node {
-    DBItem* data;
-    struct db_node* next;
-} DBNode;
+typedef struct node {
+    Item* data;
+    struct node* next;
+} Node;
 
 typedef struct database {
-    DBNode* head;
+    Node* head;
 } Database;
-
-
-
 
 
 
