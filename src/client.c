@@ -29,6 +29,7 @@ bool send_ACK(kvHandle* kv_handle){
     unsigned int ctx_flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
     int size = ctx.size;
     ctx.size = 1;
+    char first = ((char*)ctx.buf)[0];
     ((char*)ctx.buf)[0] = 'T';
     if (flagged_pp_post_send(&ctx, ctx_flag)) {
         fprintf(stderr, "Server couldn't post send\n");
@@ -36,15 +37,16 @@ bool send_ACK(kvHandle* kv_handle){
     }
     pp_wait_completions(&ctx, 1);
     ctx.size = size;
+    ((char*)ctx.buf)[0] = first;
     return EXIT_SUCCESS;
 }
-
 
 bool send_NACK(kvHandle* kv_handle){
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     unsigned int ctx_flag = IBV_SEND_SIGNALED | IBV_SEND_INLINE;
     int size = ctx.size;
     ctx.size = 1;
+    char first = ((char*)ctx.buf)[0];
     ((char*)ctx.buf)[0] = 'F';
     if (flagged_pp_post_send(&ctx, ctx_flag)) {
         fprintf(stderr, "Server couldn't post send\n");
@@ -52,6 +54,7 @@ bool send_NACK(kvHandle* kv_handle){
     }
     pp_wait_completions(&ctx, 1);
     ctx.size = size;
+    ((char*)ctx.buf)[0] = first;
     return EXIT_SUCCESS;
 }
 
@@ -169,16 +172,18 @@ bool server_pending(Database* db, kvHandle** kv_handles, char* key){
         if (set_clients[i] == true){
             // send ACK to the client
             add_in_set(db, key);
-            if (send_ACK(kv_handles[i]) == EXIT_FAILURE){
-                return EXIT_FAILURE;
+            if (found_set == false){
+                if (send_ACK(kv_handles[i]) == EXIT_FAILURE){
+                    return EXIT_FAILURE;
+                }
+            }
+            else {
+                // send Not-ACK to the client
+                if (send_NACK(kv_handles[i]) == EXIT_FAILURE){
+                    return EXIT_FAILURE;
+                }
             }
             found_set = true;
-        }
-        else{
-            // send Not-ACK to the client
-            if (send_NACK(kv_handles[i]) == EXIT_FAILURE){
-                return EXIT_FAILURE;
-            }
         }
     }
     if (found_set){
@@ -229,18 +234,18 @@ bool server_get_eager(kvHandle* kv_handle, Value* value){
     return EXIT_SUCCESS;
 }
 
-bool server_get_FIN(Database* db, kvHandle** kv_handles, char* key){
+bool server_get_FIN(Database* db, kvHandle** kv_handles, char* key, int client_idx){
     //decrease the num_in_get
     remove_num_in_get(db, key);
-
     if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
+
+    send_ACK(kv_handles[client_idx]);
     return EXIT_SUCCESS;
 }
 
 bool server_get_Ask(Database* db, kvHandle** kv_handles, char* key, int client_idx){
-    //check num_in_get is zero
     if (!valid_get(db, key) == EXIT_FAILURE) {
         if (add_get_query(db, key, client_idx) == EXIT_FAILURE) {
             return EXIT_FAILURE;
@@ -248,7 +253,7 @@ bool server_get_Ask(Database* db, kvHandle** kv_handles, char* key, int client_i
         return EXIT_SUCCESS;
     }
     else{
-        if (send_ACK(kv_handles[0]) == EXIT_FAILURE){
+        if (send_ACK(kv_handles[client_idx]) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -297,7 +302,7 @@ bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int val
     return EXIT_SUCCESS;
 }
 
-bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value){
+bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value) {
     Value *value_struct = (Value *) malloc(sizeof(Value));
     if (value_struct == NULL) {
         return EXIT_FAILURE;
@@ -316,13 +321,16 @@ bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value)
     return EXIT_SUCCESS;
 }
 
-bool server_set_FIN(Database* db, kvHandle** kv_handles, char* key){
+bool server_set_FIN(Database* db, kvHandle** kv_handles, char* key, int client_idx){
     // decrease the num_in_set
     remove_in_set(db, key);
 
     if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
+
+
+    send_ACK(kv_handles[client_idx]);
     return EXIT_SUCCESS;
 }
 
@@ -403,7 +411,7 @@ bool parse_data(Database* db, kvHandle** kv_handles, char* buf, int client_idx){
     //////////////////////// Set Fin ////////////////////////
     else if (strcmp(flag, "fs")==0){
         printf("FIN SET\n");
-        if (server_set_FIN(db, kv_handles, key) == EXIT_FAILURE){
+        if (server_set_FIN(db, kv_handles, key, client_idx) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -446,7 +454,7 @@ bool parse_data(Database* db, kvHandle** kv_handles, char* buf, int client_idx){
     //if FIN GET message
     else if (strcmp(flag, "fg")==0){
         printf("FIN GET\n");
-        if (server_get_FIN(db, kv_handles, key) == EXIT_FAILURE){
+        if (server_get_FIN(db, kv_handles, key, client_idx) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -532,6 +540,8 @@ int kv_set(void *kv_handle, const char *key, const char *value){
         return EXIT_FAILURE;
     }
 
+    // wait for ACK
+    pp_wait_completions(&ctx, 1);
 
     return EXIT_SUCCESS;
 }
@@ -564,7 +574,6 @@ int kv_get(void *kv_handle, const char *key, char **value){
         buf = buf + 2;
         *value = (char*)malloc(strlen(buf) + 1);
         sprintf(*value, "%s", buf);
-        return EXIT_SUCCESS;
     }
     else{
         // Malloc size of the value. Format: "r:size"
@@ -581,6 +590,10 @@ int kv_get(void *kv_handle, const char *key, char **value){
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
+
+    // wait for ACK
+    pp_wait_completions(&ctx, 1);
+
     return EXIT_SUCCESS;
 }
 
