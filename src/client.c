@@ -259,7 +259,6 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     char key[4*KB];
     strcpy(key, strtok(NULL, ":"));
 
-
     if (strcmp(flag, "se")==0||strcmp(flag, "sr")==0) {
 
         if (!valid_set(db, key)) {
