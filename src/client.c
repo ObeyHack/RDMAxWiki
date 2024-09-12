@@ -238,6 +238,7 @@ bool server_set_FIN(Database* db, kvHandle* kv_handle, char* key){
 /////////// Receive Query  /////////////
 //send again buffer
 char *send_again_buffer[256];
+kvHandle* send_again_kv_handle[256];
 int send_again_index = 0;
 
 bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
@@ -264,9 +265,28 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
         if (get_num_in_set(db, key, &num_in_set) == EXIT_FAILURE) {
             return EXIT_FAILURE;
         }
-        if (num_in_set != 0) {
-            // now we want to add the buf to a buffer that saves the messages that we need to send again
+        int num_in_get;
+        if (get_num_in_get(db, key, &num_in_get) == EXIT_FAILURE) {
             return EXIT_FAILURE;
+        }
+
+        if (num_in_set > 0 || num_in_get > 0) {
+
+            if (buf == send_again_buffer[send_again_index]){
+                send_again_index++;
+                return EXIT_SUCCESS;
+            }
+            else {
+                send_again_buffer[send_again_index] = (char *) malloc(strlen(buf) + 1);
+                send_again_kv_handle[send_again_index] = kv_handle;
+
+                if (send_again_buffer[send_again_index] == NULL) {
+                    return EXIT_FAILURE;
+                }
+                strcpy(send_again_buffer[send_again_index], buf);
+                send_again_index++;
+                return EXIT_SUCCESS;
+            }
         }
         //////////////////////// Set Eager ////////////////////////
         if (strcmp(flag, "se") == 0) {
@@ -280,7 +300,6 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
             if (server_set_eager(db, kv_handle, key, copy) == EXIT_FAILURE) {
                 return EXIT_FAILURE;
             }
-            return EXIT_SUCCESS;
         }
 
         //////////////////////// Set Rendezvous ////////////////////////
@@ -291,8 +310,11 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
             if (server_set_rendezvous(db, kv_handle, key, size_int) == EXIT_FAILURE) {
                 return EXIT_FAILURE;
             }
-            return EXIT_SUCCESS;
         }
+        if (buf == send_again_buffer[send_again_index]){
+            free(send_again_buffer[send_again_index]);
+        }
+        return EXIT_SUCCESS;
     }
 
     //if FIN SET message
@@ -305,7 +327,30 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     }
     Value* value;
     else if (strcmp(flag, "g0")==0){
-        printf("Get\n");
+        int num_in_set;
+        if (get_num_in_set(db, key, &num_in_set) == EXIT_FAILURE) {
+            return EXIT_FAILURE;
+        }
+
+        if (num_in_set > 0) {
+            // now we want to add the buf to a buffer that saves the messages that we need to send again
+            if (buf == send_again_buffer[send_again_index]){
+                send_again_index++;
+                return EXIT_SUCCESS;
+            }
+            else {
+                send_again_buffer[send_again_index] = (char *) malloc(strlen(buf) + 1);
+                send_again_kv_handle[send_again_index] = kv_handle;
+
+                if (send_again_buffer[send_again_index] == NULL) {
+                    return EXIT_FAILURE;
+                }
+                strcpy(send_again_buffer[send_again_index], buf);
+                send_again_index++;
+                return EXIT_SUCCESS;
+            }
+        }
+
         if (get_value(db, key, &value) == EXIT_FAILURE){
             return EXIT_FAILURE;
         }
@@ -325,6 +370,9 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
                 return EXIT_FAILURE;
             }
         }
+        if (buf == send_again_buffer[send_again_index]){
+            free(send_again_buffer[send_again_index]);
+        }
         return EXIT_SUCCESS;
     }
     //if FIN GET message
@@ -339,6 +387,7 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     return EXIT_SUCCESS;
 }
 
+int turn=0;
 bool receive_query(Database* db, kvHandle** kv_handle){
     // get list of all the ctx
     struct pingpong_context* ctx_list[NUM_CLIENTS];
@@ -349,20 +398,29 @@ bool receive_query(Database* db, kvHandle** kv_handle){
         ctx = (struct pingpong_context*)handle;
         ctx_list[i] = ctx;
     }
-
-    // wait for completions
     int client_index;
-    if (pp_wait_completions_clients(ctx_list, 1,
-            &client_index) == EXIT_FAILURE){
-        return EXIT_FAILURE;
+    char *buf;
+    if (turn == 0 && send_again_index > 0){
+        //take old work from the buffer
+        buf = send_again_buffer[send_again_index-1];
+        send_again_index--;
+
+    }
+    else{
+        // wait for completions
+        if (pp_wait_completions_clients(ctx_list, 1,
+                                        &client_index) == EXIT_FAILURE){
+            return EXIT_FAILURE;
+        }
+        buf = ctx_list[client_index]->buf;
     }
     printf("Handling query from client %d\n", client_index);
-
+    turn++;
     handle = kv_handle[client_index];
     ctx = (struct pingpong_context*)handle;
 
     // Parse data
-    if (parse_data(db, handle, ctx->buf) == EXIT_FAILURE){
+    if (parse_data(db, handle, buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 
