@@ -10,6 +10,7 @@
 
 #define KB 1024
 
+
 typedef struct Value {
     char *value;
     int size;
@@ -22,6 +23,8 @@ typedef struct item {
     Value *value;
     int num_in_set;
     int num_in_get;
+    bool client_set[NUM_CLIENTS];
+    bool client_get[NUM_CLIENTS];
 } Item;
 
 typedef struct node {
@@ -33,13 +36,31 @@ typedef struct database {
     Node *head;
 } Database;
 
-bool get_num_in_set(Database *db, const char *key, int *num_in_set);
 
-bool get_num_in_get(Database *db, const char *key, int *num_in_get);
+
+int get_num_in_set(Database *db, const char *key);
+
+int get_num_in_get(Database *db, const char *key);
 
 bool add_num_in_set(Database *db, const char *key);
 
 bool add_num_in_get(Database *db, const char *key);
+
+bool valid_set(Database *db, const char *key);
+
+bool valid_get(Database *db, const char *key);
+
+bool add_get_query(Database *db, const char *key, int client_idx);
+
+bool add_set_query(Database *db, const char *key, int client_idx);
+
+bool* get_get_query(Database *db, const char *key);
+
+bool* get_set_query(Database *db, const char *key);
+
+void empty_set_query(Database *db, const char *key);
+
+void empty_get_query(Database *db, const char *key);
 
 bool remove_num_in_set(Database *db, const char *key);
 

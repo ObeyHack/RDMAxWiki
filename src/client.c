@@ -141,6 +141,42 @@ bool client_get_rendezvous(void *kv_handle, const char *key, char **value, int s
 
 ////////////////////////// Server Functions ////////////////////////////////////
 
+bool server_pending(Database* db, kvHandle** kv_handles, char* key){
+ //check if set is available
+    int client_idx;
+    if (valid_set(db, key) == true){
+        // pick one of the set clients and remove all the rest
+        bool* set_clients = get_set_query(db, key);
+        for (int i = 0; i < NUM_CLIENTS; i++){
+            if (set_clients[i] == true){
+                client_idx = i;
+                break;
+            }
+        }
+        empty_set_query(db, key);
+        // send ACK to the client
+        if (send_ACK(kv_handles[client_idx]) == EXIT_FAILURE){
+            return EXIT_FAILURE;
+        }
+    }
+
+    // check if get is available
+    else if (valid_get(db, key) == true){
+        // send ACK for all the get clients
+        bool* get_clients = get_get_query(db, key);
+        for (int i = 0; i < NUM_CLIENTS; i++){
+            if (get_clients[i] == true){
+                if (send_ACK(kv_handles[i]) == EXIT_FAILURE){
+                    return EXIT_FAILURE;
+                }
+            }
+        }
+        empty_get_query(db, key);
+    }
+
+    return EXIT_SUCCESS;
+}
+
 /////////// Get Server  /////////////
 
 bool server_get_rendezvous(Database* db, kvHandle* kv_handle, Value* value){
@@ -168,10 +204,16 @@ bool server_get_eager(kvHandle* kv_handle, Value* value){
     return EXIT_SUCCESS;
 }
 
-bool server_get_FIN(Database* db, kvHandle* kv_handle, char* key){
+bool server_get_FIN(Database* db, kvHandle** kv_handles, char* key){
     //decrease the num_in_get
     remove_num_in_get(db, key);
+
+    if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
+
 /////////// Set Server  /////////////
 
 bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int value_size){
@@ -231,19 +273,22 @@ bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value)
     return EXIT_SUCCESS;
 }
 
-bool server_set_FIN(Database* db, kvHandle* kv_handle, char* key){
+bool server_set_FIN(Database* db, kvHandle** kv_handles, char* key){
     // decrease the num_in_set
     remove_num_in_set(db, key);
+
+    if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+    return EXIT_SUCCESS;
 }
+
+
 /////////// Receive Query  /////////////
-//send again buffer
-char *send_again_buffer[256];
-int send_again_index = 0;
 
-bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
-//    char buffer[4*KB];
-//    strcpy(buffer, buf);
 
+bool parse_data(Database* db, , kvHandle** kv_handles, char* buf, int client_idx){
+    kvHandle* kv_handle = kv_handles[client_idx];
     char* buffer = buf;
     // Data format: flag:key:x
     char* flag = strtok(buffer, ":");
@@ -251,7 +296,9 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     if (strlen(flag) != 2){
         return EXIT_FAILURE;
     }
-    if (strcmp(flag, "se") != 0 && strcmp(flag, "sr") != 0 && strcmp(flag, "g0") != 0){
+    if (strcmp(flag, "se") != 0 && strcmp(flag, "sr") != 0 && strcmp(flag, "g0") != 0 
+        && strcmp(flag, "fg") != 0 && strcmp(flag, "fs") != 0
+        && strcmp(flag, "ag") != 0 && strcmp(flag, "as") != 0){
         return EXIT_FAILURE;
     }
     char key[4*KB];
@@ -260,13 +307,11 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
 
     if (strcmp(flag, "se")==0||strcmp(flag, "sr")==0) {
         //check num_in_set is zero
-        int num_in_set;
-        if (get_num_in_set(db, key, &num_in_set) == EXIT_FAILURE) {
-            return EXIT_FAILURE;
-        }
-        if (num_in_set != 0) {
-            // now we want to add the buf to a buffer that saves the messages that we need to send again
-            return EXIT_FAILURE;
+        if (!valid_set(db, key) == EXIT_FAILURE) {
+            if (add_set_query(db, key, client_idx) == EXIT_FAILURE) {
+                return EXIT_FAILURE;
+            }
+            return EXIT_SUCCESS;
         }
         //////////////////////// Set Eager ////////////////////////
         if (strcmp(flag, "se") == 0) {
@@ -303,11 +348,15 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
         }
         return EXIT_SUCCESS;
     }
+
     Value* value;
     else if (strcmp(flag, "g0")==0){
         printf("Get\n");
         if (get_value(db, key, &value) == EXIT_FAILURE){
-            return EXIT_FAILURE;
+            if (add_get_query(db, key, client_idx) == EXIT_FAILURE) {
+                return EXIT_FAILURE;
+            }
+            return EXIT_SUCCESS;
         }
 
         //////////////////////// Get Eager ////////////////////////
@@ -339,13 +388,13 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     return EXIT_SUCCESS;
 }
 
-bool receive_query(Database* db, kvHandle** kv_handle){
+bool receive_query(Database* db, kvHandle** kv_handles){
     // get list of all the ctx
     struct pingpong_context* ctx_list[NUM_CLIENTS];
     kvHandle* handle;
     struct pingpong_context* ctx;
     for (int i = 0; i < NUM_CLIENTS; i++){
-        handle = kv_handle[i];
+        handle = kv_handles[i];
         ctx = (struct pingpong_context*)handle;
         ctx_list[i] = ctx;
     }
@@ -358,11 +407,11 @@ bool receive_query(Database* db, kvHandle** kv_handle){
     }
     printf("Handling query from client %d\n", client_index);
 
-    handle = kv_handle[client_index];
+    handle = kv_handles[client_index];
     ctx = (struct pingpong_context*)handle;
 
     // Parse data
-    if (parse_data(db, handle, ctx->buf) == EXIT_FAILURE){
+    if (parse_data(db, kv_handles, ctx->buf, client_index) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
 
@@ -382,8 +431,19 @@ int kv_open(char *servername, void **kv_handle){
 }
 
 int kv_set(void *kv_handle, const char *key, const char *value){
-//    printf("Setting value for key: %s\n", key);
-    // Flag = {get, set}
+    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
+    
+    // can I set?
+    char* flag = "as";
+    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+
+    // wait for ACK
+    pp_wait_completions(&ctx, 1);
+
+
     if (strlen(value) < 4*KB-3){
         // send rendezvous control message
         if (client_set_eager(kv_handle, key, value) == EXIT_FAILURE){
@@ -396,8 +456,7 @@ int kv_set(void *kv_handle, const char *key, const char *value){
         }
     }
     //send FIN SET message
-    struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
-    char* flag = "fs";
+    flag = "fs";
     sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
@@ -406,9 +465,19 @@ int kv_set(void *kv_handle, const char *key, const char *value){
 }
 
 int kv_get(void *kv_handle, const char *key, char **value){
-//    printf("Getting value for key: %s\n", key);
-
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
+
+    // can I get?
+    char* flag = "ag";
+    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+
+    // wait for ACK
+    pp_wait_completions(&ctx, 1);
+
+
     // 1. send get message. Format: "g0:key\0"
     char* flag = "g0";
     sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
