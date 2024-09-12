@@ -252,7 +252,8 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
     if (strlen(flag) != 2){
         return EXIT_FAILURE;
     }
-    if (strcmp(flag, "se") != 0 && strcmp(flag, "sr") != 0 && strcmp(flag, "g0") != 0){
+    if (strcmp(flag, "se") != 0 && strcmp(flag, "sr") != 0 && strcmp(flag, "g0") != 0 &&
+        strcmp(flag, "fg") != 0 && strcmp(flag, "fs") != 0){
         return EXIT_FAILURE;
     }
     char key[4*KB];
@@ -260,17 +261,8 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
 
 
     if (strcmp(flag, "se")==0||strcmp(flag, "sr")==0) {
-        //check num_in_set is zero
-        int num_in_set;
-        if (get_num_in_set(db, key, &num_in_set) == EXIT_FAILURE) {
-            return EXIT_FAILURE;
-        }
-        int num_in_get;
-        if (get_num_in_get(db, key, &num_in_get) == EXIT_FAILURE) {
-            return EXIT_FAILURE;
-        }
 
-        if (num_in_set > 0 || num_in_get > 0) {
+        if (!valid_set(db, key)) {
 
             if (buf == send_again_buffer[send_again_index]){
                 send_again_index++;
@@ -325,14 +317,11 @@ bool parse_data(Database* db, kvHandle* kv_handle, char* buf){
         }
         return EXIT_SUCCESS;
     }
-    Value* value;
-    else if (strcmp(flag, "g0")==0){
-        int num_in_set;
-        if (get_num_in_set(db, key, &num_in_set) == EXIT_FAILURE) {
-            return EXIT_FAILURE;
-        }
 
-        if (num_in_set > 0) {
+    else if (strcmp(flag, "g0")==0){
+        Value* value;
+
+        if (!valid_get(db, key)) {
             // now we want to add the buf to a buffer that saves the messages that we need to send again
             if (buf == send_again_buffer[send_again_index]){
                 send_again_index++;
@@ -400,11 +389,17 @@ bool receive_query(Database* db, kvHandle** kv_handle){
     }
     int client_index;
     char *buf;
-    if (turn == 0 && send_again_index > 0){
+    if ((turn % 2 == 0) && (send_again_index > 0)){
         //take old work from the buffer
         buf = send_again_buffer[send_again_index-1];
-        send_again_index--;
+        for (int i = 0; i < NUM_CLIENTS; i++){
+            if (kv_handle[i] == send_again_kv_handle[send_again_index-1]){
+                client_index = i;
+                break;
+            }
+        }
 
+        send_again_index--;
     }
     else{
         // wait for completions
@@ -493,7 +488,7 @@ int kv_get(void *kv_handle, const char *key, char **value){
         }
     }
     //send FIN GET message
-    char* flag = "fg";
+    flag = "fg";
     sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;

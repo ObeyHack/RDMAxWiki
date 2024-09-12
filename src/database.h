@@ -33,13 +33,18 @@ typedef struct database {
     Node *head;
 } Database;
 
-bool get_num_in_set(Database *db, const char *key, int *num_in_set);
+int get_num_in_set(Database *db, const char *key);
 
-bool get_num_in_get(Database *db, const char *key, int *num_in_get);
+int get_num_in_get(Database *db, const char *key);
 
 bool add_num_in_set(Database *db, const char *key);
 
 bool add_num_in_get(Database *db, const char *key);
+
+bool valid_set(Database *db, const char *key);
+
+bool valid_get(Database *db, const char *key);
+
 
 bool remove_num_in_set(Database *db, const char *key);
 
