@@ -10,19 +10,18 @@ bool create_database(Database** db_p){
     return EXIT_SUCCESS;
 }
 
-int get_num_in_set(Database* db, const char* key)
+bool get_in_set(Database* db, const char* key)
 {
     Node* current = db->head;
     while (current != NULL)
     {
         if (strcmp(current->data->key, key) == 0)
         {
-            return current->data->num_in_set;
+            return current->data->is_set;
         }
         current = current->next;
     }
     return 0;
-
 }
 
 int get_num_in_get(Database *db, const char *key) {
@@ -38,14 +37,14 @@ int get_num_in_get(Database *db, const char *key) {
     return 0;
 }
 
-bool add_num_in_set(Database *db, const char *key)
+bool add_in_set(Database *db, const char *key)
 {
     Node* current = db->head;
     while (current != NULL)
     {
         if (strcmp(current->data->key, key) == 0)
         {
-            current->data->num_in_set++;
+            current->data->is_set = true;
             return EXIT_SUCCESS;
         }
         current = current->next;
@@ -75,7 +74,7 @@ bool valid_set(Database *db, const char *key)
     {
         if (strcmp(current->data->key, key) == 0)
         {
-            return (current->data->num_in_set == 0 && current->data->num_in_get == 0);
+            return (current->data->is_set == false && current->data->num_in_get == 0);
         }
         current = current->next;
     }
@@ -89,8 +88,9 @@ bool valid_get(Database *db, const char *key)
     {
         if (strcmp(current->data->key, key) == 0)
         {
-            return current->data->num_in_get == 0;
+            return current->data->is_set == false;
         }
+
         current = current->next;
     }
     return true;
@@ -126,7 +126,7 @@ bool add_set_query(Database *db, const char *key, int client_idx)
     return EXIT_FAILURE;
 }
 
-bool* get_get_query(Database *db, const char *key)
+bool* get_query(Database *db, const char *key)
 {
     Node* current = db->head;
     while (current != NULL)
@@ -140,7 +140,19 @@ bool* get_get_query(Database *db, const char *key)
     return NULL;
 }
 
-
+bool* set_query(Database *db, const char *key)
+{
+    Node* current = db->head;
+    while (current != NULL)
+    {
+        if (strcmp(current->data->key, key) == 0)
+        {
+            return current->data->client_set;
+        }
+        current = current->next;
+    }
+    return NULL;
+}
 
 void empty_set_query(Database *db, const char *key){
     Node* current = db->head;
@@ -173,14 +185,14 @@ void empty_get_query(Database *db, const char *key){
 }
 
 
-bool remove_num_in_set(Database *db, const char *key)
+bool remove_in_set(Database *db, const char *key)
 {
     Node* current = db->head;
     while (current != NULL)
     {
         if (strcmp(current->data->key, key) == 0)
         {
-            current->data->num_in_set--;
+            current->data->is_set = false;
             return EXIT_SUCCESS;
         }
         current = current->next;
@@ -203,14 +215,14 @@ bool remove_num_in_get(Database *db, const char *key)
     return EXIT_FAILURE;
 }
 
-bool _add_item(Database* db, char* key, Value* value) {
+bool _add_item(Database* db, const char* key, Value* value) {
     Item *item = (Item *) malloc(sizeof(Item));
     if (item == NULL) {
         return EXIT_FAILURE;
     }
     strcpy(item->key, key);
     item->value = value;
-    item->num_in_set = 1;
+    item->is_set = true;
     Node *node = (Node *) malloc(sizeof(Node));
     if (node == NULL) {
         return EXIT_FAILURE;
@@ -240,11 +252,11 @@ bool set_item(Database* db, const char* key, Value* value){
     while (current != NULL){
         if (strcmp(current->data->key, key) == 0){
             // if the key exists, update the value
-            if (dealloc_value(&(current->data->value)) == EXIT_FAILURE) {
+            if (current->data->value != NULL && dealloc_value(&(current->data->value)) == EXIT_FAILURE) {
                 return EXIT_FAILURE;
             }
             current->data->value = value;
-            current->data->num_in_set++;
+            current->data->is_set = true;
             return EXIT_SUCCESS;
         }
         current = current->next;

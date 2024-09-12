@@ -7,6 +7,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include "infiniband/verbs.h"
+#include "bw_template.h"
 
 #define KB 1024
 
@@ -21,7 +22,7 @@ typedef struct Value {
 typedef struct item {
     char key[4 * KB];
     Value *value;
-    int num_in_set;
+    bool is_set;
     int num_in_get;
     bool client_set[NUM_CLIENTS];
     bool client_get[NUM_CLIENTS];
@@ -42,7 +43,7 @@ int get_num_in_set(Database *db, const char *key);
 
 int get_num_in_get(Database *db, const char *key);
 
-bool add_num_in_set(Database *db, const char *key);
+bool add_in_set(Database *db, const char *key);
 
 bool add_num_in_get(Database *db, const char *key);
 
@@ -54,15 +55,15 @@ bool add_get_query(Database *db, const char *key, int client_idx);
 
 bool add_set_query(Database *db, const char *key, int client_idx);
 
-bool* get_get_query(Database *db, const char *key);
+bool* get_query(Database *db, const char *key);
 
-bool* get_set_query(Database *db, const char *key);
+bool* set_query(Database *db, const char *key);
 
 void empty_set_query(Database *db, const char *key);
 
 void empty_get_query(Database *db, const char *key);
 
-bool remove_num_in_set(Database *db, const char *key);
+bool remove_in_set(Database *db, const char *key);
 
 bool remove_num_in_get(Database *db, const char *key);
 
