@@ -534,7 +534,6 @@ int kv_set(void *kv_handle, const char *key, const char *value){
 
     // wait for ACK
     pp_wait_completions(&ctx, 1);
-
     return EXIT_SUCCESS;
 }
 
