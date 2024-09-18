@@ -71,11 +71,6 @@ bool client_set_eager(void *kv_handle, const char *key, const char *value){
         return EXIT_FAILURE;
     }
 
-    // wait for ACK
-    if (pp_wait_completions(&ctx, 1) == EXIT_FAILURE){
-        fprintf(stderr, "Client couldn't wait for completions\n");
-        return EXIT_FAILURE;
-    }
     return EXIT_SUCCESS;
 }
 
@@ -314,10 +309,7 @@ bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value)
     if (set_item(db, key, value_struct) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
-    // send ACK
-    if (send_ACK(kv_handle) == EXIT_FAILURE){
-        return EXIT_FAILURE;
-    }
+
     return EXIT_SUCCESS;
 }
 
@@ -507,7 +499,7 @@ int kv_open(char *servername, void **kv_handle){
 
 int kv_set(void *kv_handle, const char *key, const char *value){
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
-    
+
     // can I set?
     char* flag = "as";
     sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
