@@ -106,7 +106,14 @@ bool client_set_rendezvous(void *kv_handle, const char *key, const char *value){
     }
     pp_wait_completions(&ctx, 1);
 
-    // 5. Deregister memory
+    // 5. send FIN SET message
+    flag = "fs";
+    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+
+    // 6. Deregister memory
     if (ibv_dereg_mr(mr)){
         fprintf(stderr, "Couldn't deregister memory region\n");
         return EXIT_FAILURE;
@@ -142,6 +149,13 @@ bool client_get_rendezvous(void *kv_handle, const char *key, char **value, int s
         return EXIT_FAILURE;
     }
     pp_wait_completions(&ctx, 1);
+
+    // 5. send FIN GET message
+    char* flag = "fg";
+    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
+    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
 
     // 6. De-register memory
     if (ibv_dereg_mr(mr)){
@@ -202,6 +216,17 @@ bool server_pending(Database* db, kvHandle** kv_handles, char* key){
 
 /////////// Get Server  /////////////
 
+bool server_get_FIN(Database* db, kvHandle** kv_handles, char* key, int client_idx){
+    //decrease the num_in_get
+    remove_num_in_get(db, key);
+    if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+
+    send_ACK(kv_handles[client_idx]);
+    return EXIT_SUCCESS;
+}
+
 bool server_get_rendezvous(Database* db, kvHandle* kv_handle, Value* value){
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
 
@@ -220,25 +245,22 @@ bool server_get_rendezvous(Database* db, kvHandle* kv_handle, Value* value){
     return EXIT_SUCCESS;
 }
 
-bool server_get_eager(kvHandle* kv_handle, Value* value){
+bool server_get_eager(Database* db, kvHandle** kv_handles, char* key, Value* value, int client_idx){
+    kvHandle* kv_handle = kv_handles[client_idx];
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
     sprintf(ctx.buf, "e:%s", value->value);
     if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
-    return EXIT_SUCCESS;
-}
 
-bool server_get_FIN(Database* db, kvHandle** kv_handles, char* key, int client_idx){
-    //decrease the num_in_get
-    remove_num_in_get(db, key);
-    if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
+    // server get FIN
+    if (server_get_FIN(db, kv_handles, key, client_idx) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
-
-    send_ACK(kv_handles[client_idx]);
     return EXIT_SUCCESS;
 }
+
+
 
 bool server_get_Ask(Database* db, kvHandle** kv_handles, char* key, int client_idx){
     if (!valid_get(db, key) == EXIT_FAILURE) {
@@ -258,6 +280,18 @@ bool server_get_Ask(Database* db, kvHandle** kv_handles, char* key, int client_i
 
 
 /////////// Set Server  /////////////
+
+bool server_set_FIN(Database* db, kvHandle** kv_handles, char* key, int client_idx){
+    // decrease the num_in_set
+    remove_in_set(db, key);
+
+    if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
+        return EXIT_FAILURE;
+    }
+
+    send_ACK(kv_handles[client_idx]);
+    return EXIT_SUCCESS;
+}
 
 bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int value_size){
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
@@ -297,7 +331,8 @@ bool server_set_rendezvous(Database* db, kvHandle* kv_handle, char* key, int val
     return EXIT_SUCCESS;
 }
 
-bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value) {
+bool server_set_eager(Database* db, kvHandle** kv_handles, char* key, char* value, int client_idx) {
+    kvHandle* kv_handle = kv_handles[client_idx];
     Value *value_struct = (Value *) malloc(sizeof(Value));
     if (value_struct == NULL) {
         return EXIT_FAILURE;
@@ -310,21 +345,13 @@ bool server_set_eager(Database* db, kvHandle* kv_handle, char* key, char* value)
         return EXIT_FAILURE;
     }
 
-    return EXIT_SUCCESS;
-}
-
-bool server_set_FIN(Database* db, kvHandle** kv_handles, char* key, int client_idx){
-    // decrease the num_in_set
-    remove_in_set(db, key);
-
-    if (server_pending(db, kv_handles, key) == EXIT_FAILURE){
+    // FIN SET
+    if (server_set_FIN(db, kv_handles, key, client_idx) == EXIT_FAILURE){
         return EXIT_FAILURE;
     }
-
-
-    send_ACK(kv_handles[client_idx]);
     return EXIT_SUCCESS;
 }
+
 
 bool server_set_Ask(Database* db, kvHandle* kv_handle, char* key, int client_idx){
     //check num_in_set is zero
@@ -383,7 +410,7 @@ bool parse_data(Database* db, kvHandle** kv_handles, char* buf, int client_idx){
             return EXIT_FAILURE;
         }
         strcpy(copy, value);
-        if (server_set_eager(db, kv_handle, key, copy) == EXIT_FAILURE) {
+        if (server_set_eager(db, kv_handles, key, copy, client_idx) == EXIT_FAILURE) {
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -429,7 +456,7 @@ bool parse_data(Database* db, kvHandle** kv_handles, char* buf, int client_idx){
         //////////////////////// Get Eager ////////////////////////
         if (value->is_large == false){
             printf("Eager get\n");
-            if (server_get_eager(kv_handle, value) == EXIT_FAILURE){
+            if (server_get_eager(db, kv_handles, key, value, client_idx) == EXIT_FAILURE){
                 return EXIT_FAILURE;
             }
         }
@@ -525,12 +552,6 @@ int kv_set(void *kv_handle, const char *key, const char *value){
             return EXIT_FAILURE;
         }
     }
-    //send FIN SET message
-    flag = "fs";
-    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
-    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
-        return EXIT_FAILURE;
-    }
 
     // wait for ACK
     pp_wait_completions(&ctx, 1);
@@ -575,16 +596,8 @@ int kv_get(void *kv_handle, const char *key, char **value){
         }
     }
 
-    //send FIN GET message
-    flag = "fg";
-    sprintf(ctx.buf, "%s:%s:%c", flag, key,'\0');
-    if (send_data_str(kv_handle, ctx.buf) == EXIT_FAILURE){
-        return EXIT_FAILURE;
-    }
-
     // wait for ACK
     pp_wait_completions(&ctx, 1);
-
     return EXIT_SUCCESS;
 }
 
