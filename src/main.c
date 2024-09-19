@@ -329,7 +329,6 @@ void run_tests(char* servername){
     sleep(8);
 
 //    test_throughout(kv_handle);
-
     test_2(kv_handle);
 //    sleep(2);
     test_3(kv_handle);
