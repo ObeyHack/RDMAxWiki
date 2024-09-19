@@ -524,6 +524,7 @@ int kv_open(char *servername, void **kv_handle){
     return EXIT_SUCCESS;
 }
 
+
 int kv_set(void *kv_handle, const char *key, const char *value){
     struct pingpong_context ctx = *(struct pingpong_context*)kv_handle;
 
