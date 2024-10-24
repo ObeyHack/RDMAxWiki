@@ -25,3 +25,8 @@ To run the code you need to have a linux machine with RDMA support. Then use the
 - Use a more efficient implmnetation data transfer using RDMA.
   - Use more low level API function in the client-server communication protcol.
 - Build a simple web interface to interact with the server.
+
+
+## Report
+
+You can find the report of the project in the following [link](https://drive.google.com/file/d/1SQdhuHIPX8Ni0VYwQ5mGddxKZo-4hlvW/view?usp=sharing)
