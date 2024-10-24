@@ -4,3 +4,4 @@
 /wiki/cmake-build-debug
 /wiki/cmake-build-debug-local-container
 ~$output.XLSX
+/.vscode
