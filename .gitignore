@@ -1,6 +1,6 @@
-/src/build
+/wiki/build
 .DS_Store
 /.idea
-/src/cmake-build-debug
-/src/cmake-build-debug-local-container
+/wiki/cmake-build-debug
+/wiki/cmake-build-debug-local-container
 ~$output.XLSX
